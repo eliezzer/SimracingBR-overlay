@@ -19,9 +19,11 @@ namespace SimracingBR
     public class HudView : FrameworkElement
     {
         const int N = 420;                       // history samples (~7 s at 60 Hz)
-        const double PAD = 12, ROW = 104, STRIP = 28, VGAP = 8, HGAP = 14, CHIPROW = 20;
-        const double FUEL_W = 112, PERLAP_W = 126, LAPS_W = 100, COMPACT_FUEL_W = 128, FUEL_ROW = 26;
-        const double CHIP_FS = 12;                       // ABS / TC / TCC chip font size (chip height = CHIP_FS + 8 = CHIPROW)
+        const double PAD = 12, ROW = 104, STRIP = 34, VGAP = 8, HGAP = 14;
+        const double FUEL_ROW = 30;
+        const double FL = 12, FV = 20, FU = 12;          // fuel label / value / unit font sizes
+        const double CHIP_FS = 15;                       // ABS / TC / TCC chip font size
+        const double CHIPROW = CHIP_FS + 8;              // chip height
 
         public Tele T = new Tele();
         public bool Unlocked;
@@ -74,8 +76,8 @@ namespace SimracingBR
                 int nFuel = (ShowFuel ? 1 : 0) + (ShowFuelPerLap ? 1 : 0) + (ShowLapsLeft ? 1 : 0);
                 chipsW = ShowAids ? ChipsW() : 0;
                 fuelCardH = nFuel > 0 ? nFuel * FUEL_ROW + 12 : 0;
-                double chipsH = ShowAids ? CHIP_FS + 10 : 0;
-                infoW = Math.Max(nFuel > 0 ? COMPACT_FUEL_W : 0, chipsW);
+                double chipsH = ShowAids ? CHIPROW : 0;
+                infoW = Math.Max(nFuel > 0 ? CompactFuelW() : 0, chipsW);
                 infoH = fuelCardH + (fuelCardH > 0 && chipsH > 0 ? 6 : 0) + chipsH;
                 compactH = Math.Max(ROW, infoH);
                 bool info = infoW > 0;
@@ -90,7 +92,7 @@ namespace SimracingBR
                 rowAids = ShowAids && ShowGraph;      // ABS / TC / TCC chips: own row below the fuel strip
                 chipsW = rowAids ? ChipsW() : 0;
                 double wMain = (ShowGraph ? 300 : 0) + (ShowGraph && ShowBars ? 10 : 0) + barsW;
-                double wFuel = rowFuel ? 20 + (ShowFuel ? FUEL_W : 0) + (ShowFuelPerLap ? PERLAP_W : 0) + (ShowLapsLeft ? LAPS_W : 0) : 0;
+                double wFuel = rowFuel ? 20 + (ShowFuel ? FuelItemW(LblFuel, "000.0", "L") : 0) + (ShowFuelPerLap ? FuelItemW(LblPerLap, "0.00", "L") : 0) + (ShowLapsLeft ? FuelItemW(LblLaps, "00.0", "") : 0) : 0;
                 colW = Math.Max(wMain, Math.Max(wFuel, chipsW));
                 graphW = ShowGraph ? colW - (ShowBars ? barsW + 10 : 0) : 0;   // graph absorbs any extra width
             }
@@ -106,7 +108,7 @@ namespace SimracingBR
 
             colX = PAD; colY = PAD + (contentH - colH) / 2;
             double x = PAD + (hasCol ? colW : 0);
-            if (hasGear) { gearX = x + (hasCol ? HGAP : 0); x = gearX + 92; }
+            if (hasGear) { gearX = x + (hasCol ? HGAP : 0); x = gearX + GearColW; }
             if (ShowWheel) { wheelX = x + (hasGear ? 8 : (hasCol ? HGAP : 0)); wheelS = Math.Min(136, contentH + 8); x = wheelX + wheelS; }
             Width = x + PAD; Height = contentH + 2 * PAD;
         }
@@ -191,7 +193,7 @@ namespace SimracingBR
             {
                 Text(dc, "Nothing selected", 13, white, true, Width / 2, 8, 1);
                 Text(dc, "Tray icon > Settings", 10, gray, false, Width / 2, 28, 1);
-                DrawUnlocked(dc);
+                DrawUnlocked(dc); DrawLockButton(dc);
                 return;
             }
 
@@ -210,7 +212,7 @@ namespace SimracingBR
             }
             if (hasGear) DrawGear(dc, white, gray);
             if (ShowWheel) DrawWheel(dc);
-            DrawUnlocked(dc);
+            DrawUnlocked(dc); DrawLockButton(dc);
         }
 
         void DrawGraph(DrawingContext dc, double gx, double gy, double gw, double gh)
@@ -238,9 +240,9 @@ namespace SimracingBR
             {
                 dc.DrawRoundedRectangle(Br(10, 255, 255, 255), null, new Rect(x, iy, infoW, fuelCardH), 3, 3);
                 double ry = iy + 6;
-                if (ShowFuel) { FuelRow(dc, x, ry, infoW, "FUEL", T.Fuel > 0 ? T.Fuel.ToString("0.0", CultureInfo.InvariantCulture) : "--", "L"); ry += FUEL_ROW; }
-                if (ShowFuelPerLap) { FuelRow(dc, x, ry, infoW, "PER LAP", PerLap > 0 ? PerLap.ToString("0.00", CultureInfo.InvariantCulture) : "--", "L"); ry += FUEL_ROW; }
-                if (ShowLapsLeft) FuelRow(dc, x, ry, infoW, "LAPS", LapsLeft > 0 ? LapsLeft.ToString("0.0", CultureInfo.InvariantCulture) : "--", "");
+                if (ShowFuel) { FuelRow(dc, x, ry, infoW, LblFuel, T.Fuel > 0 ? T.Fuel.ToString("0.0", CultureInfo.InvariantCulture) : "--", "L"); ry += FUEL_ROW; }
+                if (ShowFuelPerLap) { FuelRow(dc, x, ry, infoW, LblPerLap, PerLap > 0 ? PerLap.ToString("0.00", CultureInfo.InvariantCulture) : "--", "L"); ry += FUEL_ROW; }
+                if (ShowLapsLeft) FuelRow(dc, x, ry, infoW, LblLaps, LapsLeft > 0 ? LapsLeft.ToString("0.0", CultureInfo.InvariantCulture) : "--", "");
                 iy += fuelCardH + 6;
             }
             if (ShowAids) DrawAidsRow(dc, x, iy, infoW);
@@ -268,9 +270,30 @@ namespace SimracingBR
         {
             Brush gray = Br(255, 140, 140, 150);
             double rx = x + w - 10;
-            if (unit.Length > 0) { Text(dc, unit, 10, gray, false, rx, y + 8, 2); rx -= TextWidth(unit, 10, false) + 3; }
-            Text(dc, val, 17, Br(255, 245, 245, 245), true, rx, y + 1, 2);
-            Text(dc, label, 9, gray, true, x + 10, y + 8, 0);
+            if (unit.Length > 0) { Text(dc, unit, FU, gray, false, rx, y + 9, 2); rx -= TextWidth(unit, FU, false) + 3; }
+            Text(dc, val, FV, Br(255, 245, 245, 245), true, rx, y + 3, 2);
+            Text(dc, label, FL, gray, true, x + 10, y + 8, 0);
+        }
+
+        // labels of the fuel items (the HUD is bilingual like the rest of the UI)
+        static string LblFuel { get { return "FUEL"; } }
+        static string LblPerLap { get { return L.T("FUEL / LAP", "CONSUMO / VOLTA"); } }
+        static string LblLaps { get { return L.T("LAPS LEFT", "VOLTAS RESTANTES"); } }
+
+        // width of one item of the fuel strip: label, widest value, unit and a gap before the next item
+        double FuelItemW(string label, string sample, string unit)
+        {
+            return TextWidth(label, FL, true) + 6 + TextWidth(sample, FV, true) + (unit.Length > 0 ? 2 + TextWidth(unit, FU, false) : 0) + 22;
+        }
+
+        // widest line of the fuel card in the compact layout
+        double CompactFuelW()
+        {
+            double w = 0;
+            if (ShowFuel) w = Math.Max(w, TextWidth(LblFuel, FL, true) + TextWidth("000.0", FV, true) + TextWidth("L", FU, false) + 3);
+            if (ShowFuelPerLap) w = Math.Max(w, TextWidth(LblPerLap, FL, true) + TextWidth("0.00", FV, true) + TextWidth("L", FU, false) + 3);
+            if (ShowLapsLeft) w = Math.Max(w, TextWidth(LblLaps, FL, true) + TextWidth("00.0", FV, true));
+            return w + 32;
         }
 
         void DrawBars(DrawingContext dc, double bx, double by, double bh)
@@ -281,42 +304,63 @@ namespace SimracingBR
             Pedal(dc, x, by, bh, T.Gas, CThrottle, T.TcOn);
         }
 
+        const double CAP = 0.70;                 // digit height / font size (Bahnschrift)
+        double GearColW { get { return ShowSpeed ? 112 : 92; } }
+
+        // Draws a number centered on cx with the top of its digits at `top` (not the top of the text box),
+        // so gear and speed line up on the same axis. Returns the bottom of the digits.
+        double Digits(DrawingContext dc, string s, double size, Brush b, double cx, double top)
+        {
+            var ft = new FormattedText(s, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+                new Typeface(font, FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
+                size, b, VisualTreeHelper.GetDpi(this).PixelsPerDip);
+            dc.DrawText(ft, new Point(cx - ft.Width / 2, top - (ft.Baseline - CAP * size)));
+            return top + CAP * size;
+        }
+
         void DrawGear(DrawingContext dc, Brush white, Brush gray)
         {
-            double cx = gearX + 46;
+            double gw = GearColW;
+            double cx = gearX + (ShowSpeed ? 40 : gw / 2);      // gear and speed digits share this axis; "km/h" sits to the right
             bool tall = contentH >= 120, both = ShowGear && ShowSpeed;
             double r = T.MaxRpm > 0 ? (double)T.Rpm / T.MaxRpm : 0;
             // shift point: whole bar flashes, alternating the two shift colors
             bool flashA = (DateTime.UtcNow.Millisecond / 100) % 2 == 0;
+            bool digits = ShowGear || ShowSpeed;
             if (ShowShiftLights)
             {
-                double ly = (ShowGear || ShowSpeed) ? PAD : (Height - 6) / 2;
+                double ly = digits ? PAD : (Height - 6) / 2, lx = gearX + (gw - 94) / 2;
                 for (int i = 0; i < 10; i++)
                 {
                     bool on = T.ShiftUp || r >= 0.72 + 0.028 * i;
                     Color lc = T.ShiftUp ? (flashA ? CShiftA : CShiftB)
                         : (i < 4 ? Color.FromRgb(40, 220, 90) : (i < 7 ? Color.FromRgb(255, 210, 0) : Color.FromRgb(255, 40, 30)));
-                    dc.DrawRoundedRectangle(on ? Br(lc) : Br(255, 40, 40, 48), null, new Rect(gearX + i * 9.4, ly, 7.4, 6), 1.5, 1.5);
+                    dc.DrawRoundedRectangle(on ? Br(lc) : Br(255, 40, 40, 48), null, new Rect(lx + i * 9.4, ly, 7.4, 6), 1.5, 1.5);
                 }
             }
-            double lightsPush = ShowShiftLights ? 4 : 0;
+            // the digits fill the space under the shift lights down to the bottom padding
+            double top = PAD + (ShowShiftLights && digits ? 16 : 0), avail = Height - PAD - top, gap = 12;
+            double gs = 0, ss = 0;
+            if (both) { ss = tall ? 46 : 34; gs = Math.Min(120, (avail - gap - CAP * ss) / CAP); }
+            else if (ShowGear) gs = Math.Min(120, avail / CAP);
+            else if (ShowSpeed) ss = Math.Min(64, avail / CAP);
+            double used = (ShowGear ? CAP * gs : 0) + (both ? gap : 0) + (ShowSpeed ? CAP * ss : 0);
+            double y = top + Math.Max(0, (avail - used) / 2);
             if (ShowGear)
             {
-                string gs = T.Gear <= 0 ? "R" : (T.Gear == 1 ? "N" : (T.Gear - 1).ToString(CultureInfo.InvariantCulture));
+                string gs2 = T.Gear <= 0 ? "R" : (T.Gear == 1 ? "N" : (T.Gear - 1).ToString(CultureInfo.InvariantCulture));
                 Brush gearBrush = (T.ShiftUp && flashA) ? Br(CShiftA) : ((T.Gear == 1) ? Br(255, 225, 6, 0) : white);
-                double gearSize = both ? (tall ? 64 : 54) : (tall ? 84 : 66);
-                double gearY = both ? 14 : (Height - gearSize * 1.2) / 2 + lightsPush;
-                Text(dc, gs, gearSize, gearBrush, true, cx, gearY, 1);
+                y = Digits(dc, gs2, gs, gearBrush, cx, y) + gap;
             }
             if (ShowSpeed)
             {
-                double spSize = both ? (tall ? 46 : 32) : (tall ? 58 : 42);
-                double spY = both ? Height - spSize * 1.2 - 6 : (Height - spSize * 1.2) / 2 + lightsPush;
                 string sp = Math.Max(0, (int)Math.Round(T.SpeedKmh)).ToString(CultureInfo.InvariantCulture);
-                double w1 = TextWidth(sp, spSize, true), w2 = TextWidth(" km/h", 11, false);
-                double sx = cx - (w1 + w2) / 2;
-                Text(dc, sp, spSize, white, true, sx, spY, 0);
-                Text(dc, " km/h", 11, gray, false, sx + w1, spY + spSize * 0.82 - 11, 0);
+                double bottom = Digits(dc, sp, ss, white, cx, y);
+                double w1 = TextWidth(sp, ss, true);
+                var fu = new FormattedText("km/h", CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+                    new Typeface(font, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal),
+                    12, gray, VisualTreeHelper.GetDpi(this).PixelsPerDip);
+                dc.DrawText(fu, new Point(cx + w1 / 2 + 4, bottom - fu.Baseline));   // unit on the digits' baseline
             }
         }
 
@@ -335,9 +379,47 @@ namespace SimracingBR
         {
             dc.DrawRoundedRectangle(Br(10, 255, 255, 255), null, new Rect(x, y, w, STRIP), 3, 3);
             double ix = x + 10;
-            if (ShowFuel) { FuelItem(dc, ix, y, "FUEL", T.Fuel > 0 ? T.Fuel.ToString("0.0", CultureInfo.InvariantCulture) : "--", "L"); ix += FUEL_W; }
-            if (ShowFuelPerLap) { FuelItem(dc, ix, y, "PER LAP", PerLap > 0 ? PerLap.ToString("0.00", CultureInfo.InvariantCulture) : "--", "L"); ix += PERLAP_W; }
-            if (ShowLapsLeft) FuelItem(dc, ix, y, "LAPS", LapsLeft > 0 ? LapsLeft.ToString("0.0", CultureInfo.InvariantCulture) : "--", "");
+            if (ShowFuel) { FuelItem(dc, ix, y, LblFuel, T.Fuel > 0 ? T.Fuel.ToString("0.0", CultureInfo.InvariantCulture) : "--", "L"); ix += FuelItemW(LblFuel, "000.0", "L"); }
+            if (ShowFuelPerLap) { FuelItem(dc, ix, y, LblPerLap, PerLap > 0 ? PerLap.ToString("0.00", CultureInfo.InvariantCulture) : "--", "L"); ix += FuelItemW(LblPerLap, "0.00", "L"); }
+            if (ShowLapsLeft) FuelItem(dc, ix, y, LblLaps, LapsLeft > 0 ? LapsLeft.ToString("0.0", CultureInfo.InvariantCulture) : "--", "");
+        }
+
+        // ---- lock / unlock button, shown while the mouse is over the HUD ----------------
+        public bool Hover;                        // set by the window (the HUD is click-through, so it polls the cursor)
+        string LockText { get { return Unlocked ? L.T("LOCK", "TRAVAR") : L.T("UNLOCK", "DESTRAVAR"); } }
+
+        public Rect LockBtn
+        {
+            get
+            {
+                double w = TextWidth(LockText, 11, true) + 32;
+                return new Rect(Width - w - 8, 6, w, 24);
+            }
+        }
+
+        void DrawLockButton(DrawingContext dc)
+        {
+            if (!Hover) return;
+            Rect b = LockBtn;
+            bool over = b.Contains(Mouse.GetPosition(this));
+            Brush amber = Br(255, 255, 200, 0), ink = over ? Br(255, 10, 10, 10) : Br(255, 245, 245, 245);
+            dc.DrawRoundedRectangle(over ? amber : Br(240, 30, 30, 38), new Pen(amber, 1), b, 4, 4);
+            // padlock: body + shackle (closed while locked, open while unlocked)
+            double ix = b.X + 9, iy = b.Y + 6;
+            var pen = new Pen(ink, 1.6);
+            dc.DrawRoundedRectangle(ink, null, new Rect(ix, iy + 6, 10, 8), 1.5, 1.5);
+            var sh = new StreamGeometry();
+            using (StreamGeometryContext c = sh.Open())
+            {
+                double sx = Unlocked ? ix + 5 : ix + 2;
+                c.BeginFigure(new Point(sx, iy + 6), false, false);
+                c.LineTo(new Point(sx, iy + 3), true, false);
+                c.ArcTo(new Point(sx + 6, iy + 3), new Size(3, 3), 0, false, SweepDirection.Clockwise, true, false);
+                if (!Unlocked) c.LineTo(new Point(sx + 6, iy + 6), true, false);
+            }
+            sh.Freeze();
+            dc.DrawGeometry(null, pen, sh);
+            Text(dc, LockText, 11, ink, true, b.X + 24, b.Y + 4, 0);
         }
 
         void DrawUnlocked(DrawingContext dc)
@@ -365,10 +447,10 @@ namespace SimracingBR
         void FuelItem(DrawingContext dc, double x, double y, string label, string val, string unit)
         {
             Brush gray = Br(255, 140, 140, 150);
-            Text(dc, label, 9, gray, true, x, y + 10, 0);
-            double vx = x + TextWidth(label, 9, true) + 6;
-            Text(dc, val, 18, Br(255, 245, 245, 245), true, vx, y + 3, 0);
-            if (unit.Length > 0) Text(dc, unit, 10, gray, false, vx + TextWidth(val, 18, true) + 2, y + 10, 0);
+            Text(dc, label, FL, gray, true, x, y + 11, 0);
+            double vx = x + TextWidth(label, FL, true) + 6;
+            Text(dc, val, FV, Br(255, 245, 245, 245), true, vx, y + 5, 0);
+            if (unit.Length > 0) Text(dc, unit, FU, gray, false, vx + TextWidth(val, FV, true) + 2, y + 12, 0);
         }
 
         // Aid chip: "ABS 4 · 12%". Level 0 shows OFF; brightness follows how often the aid is cutting in.

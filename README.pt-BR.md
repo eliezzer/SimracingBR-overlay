@@ -27,7 +27,7 @@ O app descobre sozinho qual jogo está aberto. Não precisa de SimHub nem de ins
 1. Rode `SimracingBR.exe` (a pasta `assets` precisa estar ao lado dele).
 2. Ícone "S" verde e amarelo na bandeja do sistema (perto do relógio). Clique com o botão direito:
    - **Configurações...**: escolha o que aparece no HUD, tamanho e transparência.
-   - **Destravar / Travar posição**: destrava para arrastar (também `Ctrl+Shift+L` ou duplo clique no ícone).
+   - **Destravar / Travar posição**: destrava para arrastar (também `Ctrl+Shift+L` ou duplo clique no ícone). Também dá para passar o mouse sobre o HUD e clicar no botão **DESTRAVAR** / **TRAVAR** que aparece no canto superior direito.
    - **Tamanho**, **Restaurar posição**, **Modo demonstração**, **Esconder quando não está pilotando**, **Sair**.
 3. Redimensione com `Ctrl+Shift++` / `Ctrl+Shift+-`, ou destrave e use a rodinha do mouse ou arraste o canto amarelo.
 

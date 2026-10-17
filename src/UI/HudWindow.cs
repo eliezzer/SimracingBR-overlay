@@ -172,6 +172,7 @@ namespace SimracingBR
 
         void OnMouseDown(object sender, MouseButtonEventArgs e)
         {
+            if (view.Hover && view.LockBtn.Contains(Mouse.GetPosition(view))) { ToggleLock(); e.Handled = true; return; }
             if (locked) return;
             if (OnGrip()) { resizing = true; CaptureMouse(); return; }
             try { DragMove(); } catch { }
@@ -180,7 +181,9 @@ namespace SimracingBR
         void OnMouseMove(object sender, MouseEventArgs e)
         {
             if (resizing) { ApplyScale(Mouse.GetPosition(this).X / view.Width, false); return; }
-            if (!locked) Cursor = OnGrip() ? Cursors.SizeNWSE : Cursors.SizeAll;
+            if (view.Hover && view.LockBtn.Contains(Mouse.GetPosition(view))) Cursor = Cursors.Hand;
+            else if (!locked) Cursor = OnGrip() ? Cursors.SizeNWSE : Cursors.SizeAll;
+            else Cursor = Cursors.Arrow;
         }
 
         void OnMouseUp(object sender, MouseButtonEventArgs e)
@@ -196,12 +199,36 @@ namespace SimracingBR
             e.Handled = true;
         }
 
+        // The locked HUD is click-through, so it never sees the mouse. Instead the cursor is polled every frame:
+        // while it is over the HUD the window becomes clickable (still without taking focus from the game)
+        // and the lock / unlock button is drawn.
+        [StructLayout(LayoutKind.Sequential)] struct PT { public int X, Y; }
+        [StructLayout(LayoutKind.Sequential)] struct RC { public int L, T, R, B; }
+        [DllImport("user32.dll")] static extern bool GetCursorPos(out PT p);
+        [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h, out RC r);
+        bool hover;
+
+        void UpdateHover()
+        {
+            bool over = false;
+            if (hwnd != IntPtr.Zero && Visibility == Visibility.Visible && !resizing)
+            {
+                PT p; RC r;
+                over = GetCursorPos(out p) && GetWindowRect(hwnd, out r) && p.X >= r.L && p.X < r.R && p.Y >= r.T && p.Y < r.B;
+            }
+            if (over == hover) return;
+            hover = over; view.Hover = over;
+            ApplyClickThrough();
+            view.InvalidateVisual();
+        }
+
         // Locked: click-through and never takes focus from the game.
         // Unlocked: normal window that can take focus, so the game's mouse capture doesn't block dragging.
         void ApplyClickThrough()
         {
             int ex = GetWindowLong(hwnd, GWL_EXSTYLE) | WS_EX_TOOLWINDOW;
-            ex = locked ? (ex | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE) : (ex & ~(WS_EX_TRANSPARENT | WS_EX_NOACTIVATE));
+            ex = locked ? (hover ? ((ex | WS_EX_NOACTIVATE) & ~WS_EX_TRANSPARENT) : (ex | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE))
+                         : (ex & ~(WS_EX_TRANSPARENT | WS_EX_NOACTIVATE));
             SetWindowLong(hwnd, GWL_EXSTYLE, ex);
         }
 
@@ -450,6 +477,7 @@ namespace SimracingBR
             view.TcDuty += ((t.TcOn ? 1.0 : 0.0) - view.TcDuty) * 0.04;
             view.Push();
             UpdateVisibility(t);
+            UpdateHover();
             if (Visibility == Visibility.Visible) view.InvalidateVisual();
         }
 

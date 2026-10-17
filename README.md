@@ -27,7 +27,7 @@ The app detects which game is running by itself. No SimHub and nothing to instal
 1. Run `SimracingBR.exe` (keep the `assets` folder next to it).
 2. A green and yellow "S" icon appears in the system tray. Right-click it for:
    - **Settings...**: choose what the HUD shows, size and transparency.
-   - **Unlock / Lock position**: unlock to drag the HUD (also `Ctrl+Shift+L`, or double-click the tray icon).
+   - **Unlock / Lock position**: unlock to drag the HUD (also `Ctrl+Shift+L`, or double-click the tray icon). You can also hover the mouse over the HUD and click the **UNLOCK** / **LOCK** button that appears in its top-right corner.
    - **Size**, **Reset position**, **Demo mode**, **Hide when not driving**, **Quit**.
 3. Resize with `Ctrl+Shift++` / `Ctrl+Shift+-`, or unlock and scroll / drag the yellow corner.
 
