@@ -1,0 +1,196 @@
+// SimracingBR - driver overlay for sim racing games (pedal graph, ABS/TC, gear/speed, wheel, fuel).
+// Core types shared by every game: the telemetry model, the source interface, settings and UI language.
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
+using System.IO.MemoryMappedFiles;
+using System.Windows.Media;
+
+namespace SimracingBR
+{
+    // ------------------------------------------------------------------ telemetry model
+    // Every game source fills this in; the HUD only ever reads it.
+    public class Tele
+    {
+        public bool Live;
+        public float Gas, Brake, Clutch;
+        public int Gear;              // 0 = R, 1 = N, 2.. = 1st..
+        public int Rpm, MaxRpm;
+        public float SpeedKmh;
+        public float SteerDeg;        // signed wheel rotation in degrees
+        public bool AbsOn, TcOn;
+        public float Fuel;            // litres
+        public float FuelPerLap;      // litres, 0 when unknown (the HUD then measures it)
+        public int LapMs;             // current lap time
+        public int TcLevel = -1, TcCutLevel = -1, AbsLevel = -1;   // car electronics settings, 0 = off, -1 = unknown
+        public bool HasTcCut;         // the game has a separate TC cut setting (TCC chip)
+        public bool ShiftUp;          // time to shift up
+        public int Status = 2;        // AC convention: 0 off/menus, 1 replay, 2 live, 3 pause
+        public bool InPitBox;
+        public string Note = "";
+    }
+
+    // One per game. Read() returns false while the game is not running / its shared memory is missing.
+    public interface ITelemetrySource
+    {
+        string Name { get; }          // short name shown in the HUD and logs ("AC EVO", "ACC", "AMS2")
+        string[] Processes { get; }   // game process names, used for "hide when the game is not focused"
+        string Error { get; }
+        bool Read(Tele t);
+        string Probe();               // one line of raw values for --probe
+    }
+
+    // Base for games that publish memory-mapped files. Opens them lazily (retry once a second) and copies
+    // each page into a byte buffer every tick; subclasses decode the buffers.
+    public abstract class ShmSource : ITelemetrySource
+    {
+        readonly string[] maps;
+        readonly int[] lens;
+        MemoryMappedFile[] files;
+        MemoryMappedViewAccessor[] views;
+        protected readonly byte[][] Pages;
+        DateTime nextTry = DateTime.MinValue, nextProcCheck = DateTime.MinValue;
+        string error = "";
+
+        public abstract string Name { get; }
+        public abstract string[] Processes { get; }
+        public string Error { get { return error; } }
+        // Only open the maps while the game process runs (needed when another game uses the same map names).
+        protected virtual bool RequireProcess { get { return false; } }
+
+        protected ShmSource(string[] mapNames, int[] pageLens)
+        {
+            maps = mapNames; lens = pageLens;
+            Pages = new byte[maps.Length][];
+            for (int i = 0; i < maps.Length; i++) Pages[i] = new byte[lens[i]];
+        }
+
+        public abstract bool Read(Tele t);
+        public abstract string Probe();
+
+        void Close()
+        {
+            if (views != null) foreach (var v in views) if (v != null) v.Dispose();
+            if (files != null) foreach (var f in files) if (f != null) f.Dispose();
+            views = null; files = null;
+        }
+
+        bool Open()
+        {
+            if (views != null)
+            {
+                // don't keep the maps of a closed game alive
+                if (RequireProcess && DateTime.UtcNow >= nextProcCheck)
+                {
+                    nextProcCheck = DateTime.UtcNow.AddSeconds(2);
+                    if (!GameRunning()) { Close(); error = Name + " not running"; return false; }
+                }
+                return true;
+            }
+            if (DateTime.UtcNow < nextTry) return false;
+            nextTry = DateTime.UtcNow.AddSeconds(1);
+            if (RequireProcess && !GameRunning()) { error = Name + " not running"; return false; }
+            try
+            {
+                files = new MemoryMappedFile[maps.Length];
+                views = new MemoryMappedViewAccessor[maps.Length];
+                for (int i = 0; i < maps.Length; i++)
+                {
+                    files[i] = MemoryMappedFile.OpenExisting(maps[i], MemoryMappedFileRights.Read);
+                    views[i] = files[i].CreateViewAccessor(0, 0, MemoryMappedFileAccess.Read);
+                }
+                nextProcCheck = DateTime.UtcNow.AddSeconds(2);
+                error = "";
+                return true;
+            }
+            catch (Exception e) { error = e.Message; Close(); return false; }
+        }
+
+        // Copies every page into Pages. False when the game isn't there.
+        protected bool Fetch()
+        {
+            if (!Open()) return false;
+            try
+            {
+                for (int i = 0; i < maps.Length; i++)
+                {
+                    Array.Clear(Pages[i], 0, lens[i]);
+                    views[i].ReadArray<byte>(0, Pages[i], 0, (int)Math.Min(lens[i], views[i].Capacity));
+                }
+                return true;
+            }
+            catch (Exception e) { error = e.Message; Close(); return false; }
+        }
+
+        // Copies count bytes at offset of map i into buf (for big maps where only a slice is needed). Call after Fetch().
+        protected bool ReadRange(int i, long offset, byte[] buf, int count)
+        {
+            if (views == null) return false;
+            try
+            {
+                if (offset + count > views[i].Capacity) return false;
+                views[i].ReadArray<byte>(offset, buf, 0, count);
+                return true;
+            }
+            catch (Exception e) { error = e.Message; Close(); return false; }
+        }
+
+        public bool GameRunning()
+        {
+            foreach (string p in Processes)
+            {
+                Process[] ps = Process.GetProcessesByName(p);
+                bool any = ps.Length > 0;
+                foreach (Process x in ps) x.Dispose();
+                if (any) return true;
+            }
+            return false;
+        }
+
+        protected static float Clamp01(float v) { return float.IsNaN(v) ? 0 : (v < 0 ? 0 : (v > 1 ? 1 : v)); }
+    }
+
+    // ------------------------------------------------------------------ settings
+    public class Settings
+    {
+        readonly string path;
+        readonly Dictionary<string, string> d = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        public Settings(string p)
+        {
+            path = p;
+            if (!File.Exists(p)) return;
+            foreach (string line in File.ReadAllLines(p))
+            {
+                string l = line.Trim();
+                if (l.Length == 0 || l[0] == '#' || l[0] == ';') continue;
+                int i = l.IndexOf('='); if (i <= 0) continue;
+                d[l.Substring(0, i).Trim()] = l.Substring(i + 1).Trim();
+            }
+        }
+        public string Str(string k, string def) { string v; return d.TryGetValue(k, out v) ? v : def; }
+        public double Num(string k, double def) { double v; return double.TryParse(Str(k, ""), NumberStyles.Float, CultureInfo.InvariantCulture, out v) ? v : def; }
+        public bool Bool(string k, bool def) { string v = Str(k, ""); if (v == "") return def; return v == "1" || v.Equals("true", StringComparison.OrdinalIgnoreCase); }
+        public Color Col(string k, string def)
+        {
+            try { return (Color)ColorConverter.ConvertFromString(Str(k, def)); }
+            catch { return (Color)ColorConverter.ConvertFromString(def); }
+        }
+        public void Set(string k, string v) { d[k] = v; }
+        public void Save()
+        {
+            var lines = new List<string>();
+            lines.Add("# SimracingBR settings. Edit while the app is closed. Colors are #RRGGBB.");
+            foreach (var kv in d) lines.Add(kv.Key + "=" + kv.Value);
+            File.WriteAllLines(path, lines.ToArray());
+        }
+    }
+
+    // UI language: Portuguese when Windows is in Portuguese, English otherwise.
+    public static class L
+    {
+        static readonly bool Pt = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "pt";
+        public static string T(string en, string pt) { return Pt ? pt : en; }
+    }
+}
