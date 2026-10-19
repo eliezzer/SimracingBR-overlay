@@ -88,7 +88,9 @@ namespace SimracingBR
         DateTime lastChange = DateTime.MinValue;
         int lastPacket = -1;
 
-        public AcEvoSource() : base(new[] { "Local\\acevo_pmf_physics", "Local\\acevo_pmf_graphics" }, new[] { AcPhys.LEN, GFX_LEN }) { }
+        // the static page (4 KB) has the track at 136 and its layout at 168 (found with --dump); only used to tell tracks apart
+        const int STATIC_LEN = 4096, S_TRACK = 136, S_LAYOUT = 168;
+        public AcEvoSource() : base(new[] { "Local\\acevo_pmf_physics", "Local\\acevo_pmf_graphics", "Local\\acevo_pmf_static" }, new[] { AcPhys.LEN, GFX_LEN, STATIC_LEN }) { }
 
         public override string Name { get { return "AC EVO"; } }
         public override string[] Processes { get { return new[] { "AssettoCorsaEVO" }; } }
@@ -130,7 +132,7 @@ namespace SimracingBR
             t.LastLapMs = LapOrZero(BitConverter.ToInt32(gb, G_LASTLAP));
             t.BestLapMs = LapOrZero(BitConverter.ToInt32(gb, G_BESTLAP));
             t.HasLeader = false; Array.Clear(t.SessionBestSecMs, 0, 3);
-            t.TrackId = "evo|" + Str(gb, G_CAR, 33, false);
+            t.TrackId = Str(Pages[2], S_TRACK, 32, false) + "/" + Str(Pages[2], S_LAYOUT, 32, false) + "|" + Str(gb, G_CAR, 33, false);
             if (float.IsNaN(t.Fuel) || t.Fuel < 0 || t.Fuel > 1000) t.Fuel = 0;
             if (float.IsNaN(t.FuelPerLap) || t.FuelPerLap < 0 || t.FuelPerLap > 100) t.FuelPerLap = 0;
             return true;
