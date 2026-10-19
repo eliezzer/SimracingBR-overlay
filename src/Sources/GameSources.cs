@@ -53,10 +53,27 @@ namespace SimracingBR
     public class DemoSource
     {
         readonly DateTime t0 = DateTime.UtcNow;
-        public void Read(Tele t)
+        public const double Lap = 60.0, WarmUp = 3 * Lap;     // the live demo starts after 3 simulated laps (see Prime)
+
+        public void Read(Tele t) { Fill(t, (DateTime.UtcNow - t0).TotalSeconds + WarmUp); }
+
+        // Runs the demo lap by lap without waiting, so the sectors preview already has colors to show.
+        public static void Prime(SectorTracker tracker)
         {
-            double s = (DateTime.UtcNow - t0).TotalSeconds;
-            double lap = s % 60.0;
+            var t = new Tele();
+            for (double s = 0; s < WarmUp; s += 1.0 / 30) { Fill(t, s); tracker.Update(t, s * 1000); }
+        }
+
+        // The demo is a pure function of the time in seconds. Sub-sector times change from lap to lap: the position on the
+        // lap runs a little ahead / behind a steady pace, differently every lap.
+        static void Fill(Tele t, double s)
+        {
+            double lap = s % Lap;
+            int lapIdx = (int)(s / Lap);
+            double u = lap / Lap, amp = 0.045 * Math.Sin(lapIdx * 2.1 + 1.0);
+            t.TrackPos = (float)Math.Max(0, Math.Min(1, u + amp * Math.Sin(6 * Math.PI * u)));
+            t.Sector = -1; t.LapValid = true; t.InPitLane = false; t.TrackId = "demo";
+            t.HasLeader = true; t.LeaderBestMs = 59412; t.SessionBestMs = 59999; t.Drivers = 1;
             double ph = s * 1.1;
             double gas = Math.Max(0, Math.Min(1, 0.55 + 0.6 * Math.Sin(ph) + 0.15 * Math.Sin(ph * 3.1)));
             double brk = Math.Max(0, Math.Min(1, 0.9 * Math.Sin(ph + 2.4) - 0.15));

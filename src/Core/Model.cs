@@ -30,6 +30,18 @@ namespace SimracingBR
         public int Status = 2;        // AC convention: 0 off/menus, 1 replay, 2 live, 3 pause
         public bool InPitBox;
         public string Note = "";
+        // lap / sector data (sectors overlay)
+        public float TrackPos = -1;   // 0..1 position on the lap, -1 = unknown
+        public int Sector = -1;       // the game's current sector (any numbering), -1 = unknown
+        public bool LapValid = true;  // false after a cut / invalidated lap
+        public bool InPitLane;
+        public int LastLapMs, BestLapMs;           // the player's own, 0 = none yet
+        public bool HasLeader;                     // the game publishes the race leader's lap times
+        public int LeaderBestMs, LeaderLastMs;     // 0 = none yet
+        public int Drivers;                        // drivers in the session, 0 = unknown
+        public int[] SessionBestSecMs = new int[3]; // fastest main-sector times of anyone in the session (ms, 0 = unknown)
+        public int SessionBestMs;                  // fastest lap of anyone in the session, 0 = unknown
+        public string TrackId = "";                // track + car: start from scratch when either changes
     }
 
     // One per game. Read() returns false while the game is not running / its shared memory is missing.
@@ -148,6 +160,16 @@ namespace SimracingBR
             }
             return false;
         }
+
+        // fixed-size C string inside a page (UTF-8, or UTF-16 when wide)
+        protected static string Str(byte[] b, int off, int len, bool wide)
+        {
+            try { return (wide ? System.Text.Encoding.Unicode : System.Text.Encoding.UTF8).GetString(b, off, len).Split('\0')[0]; }
+            catch { return ""; }
+        }
+
+        // a game lap time in ms, or 0 while it isn't a real lap time yet
+        protected static int LapOrZero(long ms) { return ms > 0 && ms < 3600000 ? (int)ms : 0; }
 
         protected static float Clamp01(float v) { return float.IsNaN(v) ? 0 : (v < 0 ? 0 : (v > 1 ? 1 : v)); }
     }

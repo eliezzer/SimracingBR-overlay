@@ -95,7 +95,12 @@ namespace SimracingBR
             CURTIME = O("mCurrentTime"), PITMODE = O("mPitMode"), CARFLAGS = O("mCarFlags"), FUEL = O("mFuelLevel"),
             FUELCAP = O("mFuelCapacity"), SPEED = O("mSpeed"), RPM = O("mRpm"), MAXRPM = O("mMaxRPM"), GAS = O("mThrottle"),
             BRAKE = O("mBrake"), STEER = O("mSteering"), GEAR = O("mGear"), ABSACT = O("mAntiLockActive"),
-            SEQ = O("mSequenceNumber"), ABSSET = O("mAntiLockSetting"), TCSET = O("mTractionControlSetting");
+            SEQ = O("mSequenceNumber"), ABSSET = O("mAntiLockSetting"), TCSET = O("mTractionControlSetting"),
+            VIEWED = O("mViewedParticipantIndex"), NUMPART = O("mNumParticipants"), PART = O("mParticipantInfo"),
+            TRACKLEN = O("mTrackLength"), BESTLAP = O("mBestLapTime"), LASTLAP = O("mLastLapTime"), INVALID = O("mLapInvalidated"),
+            PTIMES = O("mParticipantTimes"), TRACKLOC = O("mTrackLocation"), TRACKVAR = O("mTrackVariation"), CARNAME = O("mCarName");
+        // ParticipantInfo (100 bytes): bool active, char name[64], float worldPos[3], float lapDistance, uint racePosition, ...
+        const int PART_LEN = 100, P_ACTIVE = 0, P_LAPDIST = 80, P_RACEPOS = 84, P_SECTOR = 96, MAXP = 64;
         static readonly int LEN = Marshal.SizeOf(typeof(Ams2Shm));
 
         readonly double steerLock;       // AMS2 only gives steering as -1..1; full lock-to-lock rotation in degrees
@@ -149,7 +154,51 @@ namespace SimracingBR
                      : (gs == GAME_INGAME_REPLAY || gs == GAME_FRONT_END_REPLAY) ? 1 : 0;
             uint pit = U(PITMODE);
             t.InPitBox = pit == PIT_MODE_IN_GARAGE || pit == PIT_MODE_IN_PIT;
+            t.InPitLane = pit != 0;
+            FillLaps(t);
             return true;
+        }
+
+        float LapFraction()
+        {
+            int vi = Math.Max(0, Math.Min(MAXP - 1, I(VIEWED))); float len = F(TRACKLEN);
+            return len > 100 ? F(PART + vi * PART_LEN + P_LAPDIST) / len : -1;
+        }
+
+        // lap position, sector, lap times and the race leader's times (mParticipantTimes = 8 arrays of 64 floats:
+        // sector 1-3 current, sector 1-3 fastest, fastest lap, last lap)
+        void FillLaps(Tele t)
+        {
+            int vi = I(VIEWED), n = Math.Max(0, Math.Min(MAXP, I(NUMPART)));
+            t.TrackPos = -1; t.Sector = -1;
+            if (vi >= 0 && vi < MAXP)
+            {
+                float f = LapFraction();
+                if (f >= 0 && f <= 1.01f) t.TrackPos = Math.Min(1f, f);
+                t.Sector = I(PART + vi * PART_LEN + P_SECTOR);
+            }
+            t.LapValid = Pages[0][INVALID] == 0;
+            t.BestLapMs = LapOrZero((long)(F(BESTLAP) * 1000));
+            t.LastLapMs = LapOrZero((long)(F(LASTLAP) * 1000));
+            t.HasLeader = true; t.LeaderBestMs = 0; t.LeaderLastMs = 0;
+            t.SessionBestMs = 0; Array.Clear(t.SessionBestSecMs, 0, 3); t.Drivers = n;
+            for (int i = 0; i < n; i++)
+            {
+                if (Pages[0][PART + i * PART_LEN + P_ACTIVE] == 0) continue;
+                int best = LapOrZero((long)(F(PTIMES + (6 * MAXP + i) * 4) * 1000));
+                if (best > 0 && (t.SessionBestMs == 0 || best < t.SessionBestMs)) t.SessionBestMs = best;
+                for (int k = 0; k < 3; k++)
+                {
+                    int sec = LapOrZero((long)(F(PTIMES + ((3 + k) * MAXP + i) * 4) * 1000));
+                    if (sec > 0 && (t.SessionBestSecMs[k] == 0 || sec < t.SessionBestSecMs[k])) t.SessionBestSecMs[k] = sec;
+                }
+                if (U(PART + i * PART_LEN + P_RACEPOS) == 1)
+                {
+                    t.LeaderBestMs = best;
+                    t.LeaderLastMs = LapOrZero((long)(F(PTIMES + (7 * MAXP + i) * 4) * 1000));
+                }
+            }
+            t.TrackId = Str(Pages[0], TRACKLOC, 64, false) + "/" + Str(Pages[0], TRACKVAR, 64, false) + "|" + Str(Pages[0], CARNAME, 64, false);
         }
 
         public override string Probe()
@@ -158,11 +207,12 @@ namespace SimracingBR
             return string.Format(CultureInfo.InvariantCulture,
                 "ver={0} size={1} seq={2} game={3} pit={4} uGas={5:0.00} uBrk={6:0.00} uClu={7:0.00} uSteer={8:0.000} " +
                 "gas={9:0.00} brk={10:0.00} steer={11:0.000} gear={12} rpm={13:0} maxRpm={14:0} spd={15:0.0} " +
-                "fuel={16:0.000}x{17:0.0}L lapT={18:0.000} absAct={19} absSet={20} tcSet={21} flags=0x{22:X} (abs={23} tcs={24})",
+                "fuel={16:0.000}x{17:0.0}L lapT={18:0.000} absAct={19} absSet={20} tcSet={21} flags=0x{22:X} (abs={23} tcs={24}) pos={25:0.0000} sector={26} best={27:0.000} last={28:0.000} invalid={29}",
                 U(VERSION), LEN, U(SEQ), U(GAMESTATE), U(PITMODE), F(U_GAS), F(U_BRAKE), F(U_CLUTCH), F(U_STEER),
                 F(GAS), F(BRAKE), F(STEER), I(GEAR), F(RPM), F(MAXRPM), F(SPEED) * 3.6f,
                 F(FUEL), F(FUELCAP), F(CURTIME), Pages[0][ABSACT], I(ABSSET), I(TCSET), flags,
-                (flags & CAR_ABS) != 0 ? 1 : 0, (flags & CAR_TCS) != 0 ? 1 : 0);
+                (flags & CAR_ABS) != 0 ? 1 : 0, (flags & CAR_TCS) != 0 ? 1 : 0,
+                LapFraction(), I(PART + Math.Max(0, Math.Min(MAXP - 1, I(VIEWED))) * PART_LEN + P_SECTOR), F(BESTLAP), F(LASTLAP), Pages[0][INVALID]);
         }
     }
 }

@@ -68,9 +68,10 @@ namespace SimracingBR
         static int S(string f) { return (int)Marshal.OffsetOf(typeof(AccStatic), f); }
         static readonly int G_STATUS = G("status"), G_LAPMS = G("iCurrentTime"), G_INPIT = G("isInPit"), G_PITLANE = G("isInPitLane"),
             G_SETUP = G("isSetupMenuVisible"), G_TC = G("TC"), G_TCCUT = G("TCCut"), G_ABS = G("ABS"),
-            G_FUELLAP = G("fuelXLap"), G_LAPSLEFT = G("fuelEstimatedLaps"), G_LAPS = G("completedLaps");
+            G_FUELLAP = G("fuelXLap"), G_LAPSLEFT = G("fuelEstimatedLaps"), G_LAPS = G("completedLaps"),
+            G_DRIVERS = G("activeCars"), G_NPOS = G("normalizedCarPosition"), G_SECTOR = G("currentSectorIndex"), G_LAST = G("iLastTime"), G_BEST = G("iBestTime"), G_VALID = G("isValidLap");
         static readonly int GFX_LEN = G("fuelEstimatedLaps") + 4;
-        static readonly int S_MAXRPM = S("maxRpm"), S_MAXFUEL = S("maxFuel"), S_SMVER = S("smVersion");
+        static readonly int S_MAXRPM = S("maxRpm"), S_MAXFUEL = S("maxFuel"), S_SMVER = S("smVersion"), S_TRACK = S("track"), S_CAR = S("carModel");
         static readonly int STATIC_LEN = S("maxFuel") + 4;
 
         readonly double steerLock;       // ACC only gives steering as -1..1; full lock-to-lock rotation in degrees
@@ -117,6 +118,16 @@ namespace SimracingBR
             t.HasTcCut = true;
             t.Status = BitConverter.ToInt32(gb, G_STATUS);
             t.InPitBox = BitConverter.ToInt32(gb, G_INPIT) != 0 || BitConverter.ToInt32(gb, G_SETUP) != 0;
+            float np = BitConverter.ToSingle(gb, G_NPOS);
+            t.TrackPos = np >= 0 && np <= 1 ? np : -1;
+            t.Sector = BitConverter.ToInt32(gb, G_SECTOR);
+            t.LapValid = BitConverter.ToInt32(gb, G_VALID) != 0;
+            t.InPitLane = BitConverter.ToInt32(gb, G_PITLANE) != 0;
+            t.LastLapMs = LapOrZero(BitConverter.ToInt32(gb, G_LAST));
+            t.BestLapMs = LapOrZero(BitConverter.ToInt32(gb, G_BEST));
+            t.HasLeader = false; Array.Clear(t.SessionBestSecMs, 0, 3);
+            t.Drivers = BitConverter.ToInt32(gb, G_DRIVERS);
+            t.TrackId = Str(sb, S_TRACK, 66, true) + "|" + Str(sb, S_CAR, 66, true);
             if (float.IsNaN(t.Fuel) || t.Fuel < 0 || t.Fuel > 1000) t.Fuel = 0;
             if (float.IsNaN(t.FuelPerLap) || t.FuelPerLap < 0 || t.FuelPerLap > 100) t.FuelPerLap = 0;
             return true;
@@ -129,7 +140,7 @@ namespace SimracingBR
                 "smVer={0} pktP={1} gas={2:0.00} brk={3:0.00} clu={4:0.00} gear={5} rpm={6} maxRpmP={7} maxRpmS={8} spd={9:0.0} " +
                 "steer={10:0.000} tcAct={11} absAct={12} tcF={13:0.000} absF={14:0.000} fuel={15:0.00} maxFuel={16:0.0} " +
                 "fuelXLap={17:0.000} lapsLeft={18:0.0} lapMs={19} laps={20} tc={21} tcCut={22} abs={23} " +
-                "status={24} inPit={25} pitLane={26} setup={27}",
+                "status={24} inPit={25} pitLane={26} setup={27} npos={28:0.0000} sector={29} lastLap={30} bestLap={31} valid={32}",
                 System.Text.Encoding.Unicode.GetString(sb, S_SMVER, 30).TrimEnd('\0'),
                 BitConverter.ToInt32(pb, 0), BitConverter.ToSingle(pb, AcPhys.GAS), BitConverter.ToSingle(pb, AcPhys.BRAKE),
                 BitConverter.ToSingle(pb, AcPhys.CLUTCH), BitConverter.ToInt32(pb, AcPhys.GEAR), BitConverter.ToInt32(pb, AcPhys.RPM),
@@ -140,7 +151,8 @@ namespace SimracingBR
                 BitConverter.ToSingle(gb, G_FUELLAP), BitConverter.ToSingle(gb, G_LAPSLEFT), BitConverter.ToInt32(gb, G_LAPMS),
                 BitConverter.ToInt32(gb, G_LAPS), BitConverter.ToInt32(gb, G_TC), BitConverter.ToInt32(gb, G_TCCUT), BitConverter.ToInt32(gb, G_ABS),
                 BitConverter.ToInt32(gb, G_STATUS), BitConverter.ToInt32(gb, G_INPIT), BitConverter.ToInt32(gb, G_PITLANE),
-                BitConverter.ToInt32(gb, G_SETUP));
+                BitConverter.ToInt32(gb, G_SETUP), BitConverter.ToSingle(gb, G_NPOS), BitConverter.ToInt32(gb, G_SECTOR),
+                BitConverter.ToInt32(gb, G_LAST), BitConverter.ToInt32(gb, G_BEST), BitConverter.ToInt32(gb, G_VALID));
         }
     }
 }
