@@ -3,8 +3,8 @@
 // (0..1) and the current lap time. So the lap is cut into 3 main sectors x N sub-sectors and every crossing is timed.
 //
 // Colors:
-//   purple = the best time anyone did on that stretch (all drivers where the game publishes it, else your own best),
-//   green = faster than the same stretch of your best lap, yellow = slower, gray = nothing to compare with yet.
+//   purple = faster than your best lap there and than every other driver (where the game publishes their times),
+//   green = faster than your best lap but someone else was faster, yellow = slower than your best lap, gray = not driven yet.
 using System;
 using System.Diagnostics;
 using System.Globalization;
@@ -35,7 +35,7 @@ namespace SimracingBR
 
         // references
         int[] othersSec = new int[Main];       // best main-sector times of all drivers (ms, 0 = the game doesn't say)
-        double[] secT, secOwn, secPrev; bool[] secValid;   // what each main sector was scored with (to score it again)
+        double[] secT, secRef; bool[] secValid;   // what each main sector was scored with (to score it again)
         int wrapTick; bool pendingClear;       // crossing of the finish line: colors go back to gray after HoldMs
         public int HoldMs = 2500;
         double[] lastSeg, lastSec;             // the previous time through each stretch (reference until a best lap exists)
@@ -69,7 +69,7 @@ namespace SimracingBR
             Seg = new SegState[n]; Sec = new SegState[Main];
             SegMs = Fill(n); SecMs = Fill(Main);
             SegStamp = new int[n]; SecStamp = new int[Main];
-            refCross = Fill(n + 1); Ahead = false; provSeg = new bool[n]; provSec = new bool[Main]; lastSeg = Fill(n); lastSec = Fill(Main); secT = Fill(Main); secOwn = Fill(Main); secPrev = Fill(Main); secValid = new bool[Main];
+            refCross = Fill(n + 1); Ahead = false; provSeg = new bool[n]; provSec = new bool[Main]; lastSeg = Fill(n); lastSec = Fill(Main); secT = Fill(Main); secRef = Fill(Main); secValid = new bool[Main];
             bestSeg = Fill(n); refSeg = Fill(n); bestSec = Fill(Main); refSec = Fill(Main); refTotal = Nan;
             cross = Fill(n + 1);
             bound = new double[n + 1];
@@ -261,17 +261,18 @@ namespace SimracingBR
         }
 
         // ---- scoring ------------------------------------------------------------------------
-        // purple = faster than your best there AND than every other driver's best (where the game says; otherwise just yours),
-        // green  = not purple, but better than your previous time through (or you have none: someone else is faster),
-        // yellow = slower than your previous time through.
-        // `others` = the best time of all drivers, 0 when the game doesn't publish it.
-        static SegState Classify(double t, double ownBest, double prev, double others, bool valid)
+        // Your best lap is the reference (the lap with the lowest time, valid and driven from line to line).
+        // purple = faster than your best lap there AND faster than every other driver there (where the game says; otherwise
+        //          nobody else is known, so only your best lap counts),
+        // green  = faster than your best lap but someone else was faster,
+        // yellow = slower than your best lap.
+        // Until you have a best lap: purple if nobody was faster, otherwise green.
+        // `others` = the best time of all drivers on that stretch, 0 when the game doesn't publish it.
+        static SegState Classify(double t, double bestLap, double others, bool valid)
         {
-            bool beatsOwn = double.IsNaN(ownBest) || t <= ownBest + 2;          // within 2 ms counts as equal
             bool beatsOthers = others <= 0 || t <= others + 30;                  // our clock and the game's differ by a few ms
-            if (beatsOwn && beatsOthers) return valid ? SegState.Purple : SegState.Green;
-            if (double.IsNaN(prev)) return SegState.Green;
-            return t <= prev + 2 ? SegState.Green : SegState.Yellow;
+            if (!double.IsNaN(bestLap) && t > bestLap + 2) return SegState.Yellow;   // within 2 ms counts as equal
+            return beatsOthers && valid ? SegState.Purple : SegState.Green;
         }
 
         // a valid lap sets the record; an invalid one only leaves a placeholder where there is nothing yet
@@ -287,7 +288,7 @@ namespace SimracingBR
             double a = cross[i], b = cross[i + 1];
             if (double.IsNaN(a) || double.IsNaN(b) || b <= a) return;
             int now = Environment.TickCount;
-            SegMs[i] = b - a; Seg[i] = Classify(b - a, provSeg[i] ? Nan : bestSeg[i], lastSeg[i], 0, lapValid); SegStamp[i] = now;
+            SegMs[i] = b - a; Seg[i] = Classify(b - a, refSeg[i], 0, lapValid); SegStamp[i] = now;
             lastSeg[i] = b - a;
             Record(ref bestSeg[i], ref provSeg[i], b - a);   // records are kept as soon as the stretch is driven
             if ((i + 1) % Subs == 0)
@@ -295,8 +296,8 @@ namespace SimracingBR
                 int m = i / Subs;
                 double s0 = cross[m * Subs];
                 if (secBad || double.IsNaN(s0) || b <= s0) return;
-                secT[m] = b - s0; secOwn[m] = provSec[m] ? Nan : bestSec[m]; secPrev[m] = lastSec[m]; secValid[m] = lapValid;
-                SecMs[m] = secT[m]; Sec[m] = Classify(secT[m], secOwn[m], secPrev[m], othersSec[m], lapValid); SecStamp[m] = now;
+                secT[m] = b - s0; secRef[m] = refSec[m]; secValid[m] = lapValid;
+                SecMs[m] = secT[m]; Sec[m] = Classify(secT[m], secRef[m], othersSec[m], lapValid); SecStamp[m] = now;
                 lastSec[m] = secT[m];
                 Record(ref bestSec[m], ref provSec[m], secT[m]);
             }
@@ -306,7 +307,7 @@ namespace SimracingBR
         void Rescore()
         {
             for (int m = 0; m < Main; m++)
-                if (!double.IsNaN(secT[m]) && Sec[m] != SegState.None) Sec[m] = Classify(secT[m], secOwn[m], secPrev[m], othersSec[m], secValid[m]);
+                if (!double.IsNaN(secT[m]) && Sec[m] != SegState.None) Sec[m] = Classify(secT[m], secRef[m], othersSec[m], secValid[m]);
             // after the finish line the colors stay for a moment (so the last stretch can be seen), then go back to gray
             if (pendingClear && Environment.TickCount - wrapTick >= HoldMs)
             {
