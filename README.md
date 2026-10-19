@@ -114,3 +114,7 @@ Two more overlays, off by default (switch them on in **Settings**; the pedals ov
 A fifth overlay (off by default): the hot pressure of the four tyres (green within 0.5 psi of the target, amber within 1, red beyond), their core temperature, and, after two valid laps, the **cold pressure to put in the setup** so that the hot pressure ends up at the target (27.0 psi by default).
 
 `advice = target * cold / hot`: the cold pressure is the one the car shows standing in the pits at the start of the session (or what you type in Settings), the hot one is the average over the last valid lap. Example: setup 25.5, hot 27.9 -> 27.0 * 25.5 / 27.9 = 24.7. The out lap and invalid laps don't count; if the pressure is still rising it says so (check again after another lap). Needs a game that publishes the tyre pressure: AC EVO and ACC (physics page, `wheelsPressure` / `tyreCoreTemperature`). Settings: target, number of valid laps, optional setup pressure per wheel.
+
+### Showing the fuel and tyre overlays on the game's setup screen
+
+The fuel and tyre overlays have a **When to show** choice in Settings: on track, on the setup screen, or both (setup screen by default). On the setup screen they appear where you place them (unlock with `Ctrl+Shift+L` to drag) and go away when you leave it, so the numbers are there while you type the setup. How the setup screen is detected: AC EVO (in the pit box, car still, engine off: found with `--probe`, the garage main menu has the engine idling), ACC (`isSetupMenuVisible`), LMU (garage stall). The game's setup files aren't touched.

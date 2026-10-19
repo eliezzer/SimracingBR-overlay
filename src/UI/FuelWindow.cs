@@ -12,7 +12,7 @@ namespace SimracingBR
 
         public readonly FuelView View;
 
-        FuelWindow(Settings s, FuelView view) : base(s, "Fuel", "FuelEnabled", L.T("Fuel", "Combustível"), view, 40, 0.2, false) { View = view; }
+        FuelWindow(Settings s, FuelView view) : base(s, "Fuel", "FuelEnabled", L.T("Fuel", "Combustível"), view, 40, 0.2, false, 1) { View = view; }
 
         public static FuelWindow Create(Settings s, Tele t)
         {

@@ -154,6 +154,7 @@ namespace SimracingBR
                      : (gs == GAME_INGAME_REPLAY || gs == GAME_FRONT_END_REPLAY) ? 1 : 0;
             uint pit = U(PITMODE);
             t.InPitBox = pit == PIT_MODE_IN_GARAGE || pit == PIT_MODE_IN_PIT;
+            t.InSetup = false;
             t.InPitLane = pit != 0;
             FillLaps(t);
             return true;

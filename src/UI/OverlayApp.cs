@@ -318,10 +318,49 @@ namespace SimracingBR
             root.Children.Add(Legend(Color.FromRgb(36, 36, 44), L.T("Not driven yet in this lap", "Ainda não passou por aqui nesta volta")));
         }
 
+        // where an overlay is shown: on the track, on the game's setup screen, or both
+        void AddVisChoice(Panel p, OverlayWindow o)
+        {
+            AddSection(p, L.T("WHEN TO SHOW", "QUANDO MOSTRAR"));
+            string[] names = { L.T("On track", "Na pista"), L.T("Setup screen", "Tela de setup"), L.T("Both", "Os dois") };
+            var row = new Grid { Margin = new Thickness(0, 6, 0, 0) };
+            var cells = new Border[3];
+            for (int i = 0; i < 3; i++)
+            {
+                int idx = i;
+                row.ColumnDefinitions.Add(new ColumnDefinition());
+                var tb = new TextBlock { Text = names[i], FontWeight = FontWeights.SemiBold, FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center };
+                cells[i] = new Border { Child = tb, Padding = new Thickness(0, 7, 0, 7), Cursor = Cursors.Hand, BorderThickness = new Thickness(1), Margin = new Thickness(i == 0 ? 0 : 4, 0, 0, 0) };
+                cells[i].MouseLeftButtonUp += delegate { o.SetVisMode(idx); foreach (Action r in refreshers) r(); };
+                Grid.SetColumn(cells[i], i);
+                row.Children.Add(cells[i]);
+            }
+            Action paint = delegate
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    bool on = o.VisMode == i;
+                    cells[i].Background = new SolidColorBrush(on ? Color.FromRgb(40, 40, 50) : Color.FromRgb(26, 26, 33));
+                    cells[i].BorderBrush = on ? Accent : new SolidColorBrush(Color.FromRgb(50, 50, 58));
+                    ((TextBlock)cells[i].Child).Foreground = on ? Brushes.White : Muted;
+                }
+            };
+            refreshers.Add(paint); paint();
+            p.Children.Add(row);
+            p.Children.Add(new TextBlock
+            {
+                Text = L.T("On the setup screen the overlay appears where you place it (unlock with Ctrl+Shift+L to drag it) and goes away when you leave that screen.",
+                           "Na tela de setup o overlay aparece onde você o posicionar (destrave com Ctrl+Shift+L para arrastar) e some quando você sai dessa tela."),
+                Foreground = Muted, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0)
+            });
+        }
+
+
         void BuildFuelPage(Panel root)
         {
             FuelView v = fuel.View;
             Action after = fuel.LayoutChanged;
+            AddVisChoice(root, fuel);
             AddSection(root, L.T("FUEL", "COMBUSTÍVEL"));
             AddCheck(root, L.T("Fuel in the tank (with a level bar)", "Combustível no tanque (com barra de nível)"), "FuelShowFuel", () => v.ShowFuel, x => v.ShowFuel = x, after);
             AddCheck(root, L.T("Consumption per lap", "Consumo por volta"), "FuelShowPerLap", () => v.ShowPerLap, x => v.ShowPerLap = x, after);
@@ -349,6 +388,7 @@ namespace SimracingBR
         {
             TyreView v = tyre.View;
             Action after = tyre.LayoutChanged;
+            AddVisChoice(root, tyre);
             root.Children.Add(new TextBlock
             {
                 Text = L.T("After the valid laps asked for, it tells you the COLD pressure to put in the setup so that the hot pressure ends up at the target: target x cold / hot. Example: setup 25.5, hot 27.9 -> 24.7. The cold value is the pressure the car shows at the start of the session, standing in the pits (or the value typed below). Needs a game that publishes tyre pressure (AC EVO, ACC).",
@@ -560,8 +600,9 @@ namespace SimracingBR
             fuel.Tick(t);
             elec.Tick(t);
             tyre.Tick(t, preview);
-            bool want = ShouldShow(t);
-            foreach (OverlayWindow w in overlays) { w.Present(want); w.PollHover(); }
+            bool onTrack = ShouldShow(t), force = !locked || useDemo || settingsOpen;
+            bool inSetup = t.Live && t.InSetup && (!hideUnfocused || GameFocused());
+            foreach (OverlayWindow w in overlays) { w.Present(force || w.WantShown(onTrack, inSetup)); w.PollHover(); }
         }
 
         bool ShouldShow(Tele t)

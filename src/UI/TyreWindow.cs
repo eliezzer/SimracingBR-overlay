@@ -14,7 +14,7 @@ namespace SimracingBR
         public readonly TyreView View;
         readonly TyreModel live = new TyreModel(), demoModel = new TyreModel();   // the demo (settings preview) never touches the real measurements
 
-        TyreWindow(Settings s, TyreView view) : base(s, "Tyre", "TyreEnabled", L.T("Tyres", "Pneus"), view, 240, 0.65, false) { View = view; view.M = live; }
+        TyreWindow(Settings s, TyreView view) : base(s, "Tyre", "TyreEnabled", L.T("Tyres", "Pneus"), view, 240, 0.65, false, 1) { View = view; view.M = live; }
 
         public static TyreWindow Create(Settings s, Tele t)
         {

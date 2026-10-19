@@ -247,6 +247,7 @@ namespace SimracingBR
             t.ShiftUp = t.MaxRpm > 0 && t.Rpm >= t.MaxRpm * 0.97;
             t.Status = si[S_REALTIME] != 0 ? 2 : 0;              // at the monitor / garage screen otherwise
             t.InPitBox = vehIdx >= 0 && veh[vehIdx * VEH_LEN + V_GARAGE] != 0;
+            t.InSetup = t.InPitBox;
             FillLaps(t, et, nVeh);
             FillExtras(t, nVeh);
             return true;

@@ -119,6 +119,7 @@ namespace SimracingBR
             t.HasTcCut = true;
             t.Status = BitConverter.ToInt32(gb, G_STATUS);
             t.InPitBox = BitConverter.ToInt32(gb, G_INPIT) != 0 || BitConverter.ToInt32(gb, G_SETUP) != 0;
+            t.InSetup = BitConverter.ToInt32(gb, G_SETUP) != 0;
             float np = BitConverter.ToSingle(gb, G_NPOS);
             t.TrackPos = np >= 0 && np <= 1 ? np : -1;
             t.Sector = BitConverter.ToInt32(gb, G_SECTOR);

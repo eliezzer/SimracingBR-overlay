@@ -55,6 +55,7 @@ namespace SimracingBR
         public float BatteryPct = -1;              // hybrid battery / ERS charge, 0..100
         public float EnergyPct = -1;               // virtual energy left (LMU hypercars), 0..100
         public int Drs = -1;                       // -1 none, 0 off, 1 available, 2 open
+        public bool InSetup;                       // the game is showing its car setup screen
         public float[] TyrePsi = { -1, -1, -1, -1 };      // pressure of each tyre in psi (FL, FR, RL, RR), -1 = unknown
         public float[] TyreTemp = { -1, -1, -1, -1 };     // core temperature of each tyre in degrees C, -1 = unknown
         public float[] TyreColdPsi = { -1, -1, -1, -1 };  // the cold / setup pressure when the game publishes it, -1 = unknown

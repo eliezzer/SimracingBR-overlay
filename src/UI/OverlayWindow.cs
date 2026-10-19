@@ -39,17 +39,35 @@ namespace SimracingBR
         public bool Hovered { get { return hover; } }
         public double Scale { get { return scale; } }
         public bool Enabled { get; private set; }
+        // where the overlay is shown: 0 on the track, 1 on the setup screen, 2 both (only for the overlays that offer the choice)
+        public bool HasVisMode { get; private set; }
+        public int VisMode { get; private set; }
+
+        public void SetVisMode(int mode)
+        {
+            VisMode = Math.Max(0, Math.Min(2, mode));
+            cfg.Set(prefix + "Vis", VisMode.ToString(CultureInfo.InvariantCulture)); QueueSave();
+        }
+
+        // should the overlay be on screen, given whether the track overlays and the setup screen are showing
+        public bool WantShown(bool onTrack, bool inSetup)
+        {
+            if (!HasVisMode) return onTrack;
+            return (onTrack && VisMode != 1) || (inSetup && VisMode != 0);
+        }
 
         public event Action LockToggleRequested;     // the lock button on the overlay was clicked
         public event Action ScaleChanged;
 
         // defaultTop: where the overlay goes the first time, as a distance from the bottom edge of the screen
         protected OverlayWindow(Settings s, string prefix, string enabledKey, string title, FrameworkElement view, double defaultBottom,
-                                double defaultCenterX = 0.5, bool defaultEnabled = true)
+                                double defaultCenterX = 0.5, bool defaultEnabled = true, int defaultVis = -1)
         {
             cfg = s; this.prefix = prefix; this.enabledKey = enabledKey; Title2 = title;
             elem = view; iv = (IOverlayView)view;
             Enabled = s.Bool(enabledKey, defaultEnabled);
+            HasVisMode = defaultVis >= 0;
+            VisMode = HasVisMode ? (int)Math.Max(0, Math.Min(2, s.Num(prefix + "Vis", defaultVis))) : 0;
             WindowStyle = WindowStyle.None; AllowsTransparency = true; Background = Brushes.Transparent;
             Topmost = true; ShowInTaskbar = false; ResizeMode = ResizeMode.NoResize; SizeToContent = SizeToContent.WidthAndHeight;
             ShowActivated = false;
