@@ -33,7 +33,8 @@ namespace SimracingBR
         public int OwnBestMs, OwnLastMs;       // lap times seen by the tracker (used when the game doesn't publish them)
 
         // references
-        double[] bestSeg, refSeg, bestSec, refSec;
+        double[] bestSeg, refSeg, bestSec, refSec, refCross;   // refCross: lap time at each boundary on the best lap
+        public bool Ahead;                     // the lap in progress is ahead of the best lap so far
         double refTotal = Nan;
         // boundaries of the main sectors on the lap (0..1); the first two are learned from the game's sector changes
         double e1 = 1.0 / 3, e2 = 2.0 / 3;
@@ -61,6 +62,7 @@ namespace SimracingBR
             Seg = new SegState[n]; Sec = new SegState[Main];
             SegMs = Fill(n); SecMs = Fill(Main);
             SegStamp = new int[n]; SecStamp = new int[Main];
+            refCross = Fill(n + 1); Ahead = false;
             bestSeg = Fill(n); refSeg = Fill(n); bestSec = Fill(Main); refSec = Fill(Main); refTotal = Nan;
             cross = Fill(n + 1);
             bound = new double[n + 1];
@@ -96,7 +98,8 @@ namespace SimracingBR
         {
             for (int i = 0; i < Count; i++) { Seg[i] = SegState.None; SegMs[i] = Nan; bestSeg[i] = Nan; refSeg[i] = Nan; }
             for (int m = 0; m < Main; m++) { Sec[m] = SegState.None; SecMs[m] = Nan; bestSec[m] = Nan; refSec[m] = Nan; }
-            refTotal = Nan; OwnBestMs = 0; OwnLastMs = 0;
+            refTotal = Nan; OwnBestMs = 0; OwnLastMs = 0; Ahead = false;
+            for (int i = 0; i <= Count; i++) refCross[i] = Nan;
             clean = false;
         }
 
@@ -147,7 +150,7 @@ namespace SimracingBR
                         double f = pos > prevPos ? (bound[nextIdx] - prevPos) / (pos - prevPos) : 1;
                         f = Math.Max(0, Math.Min(1, f));
                         cross[nextIdx] = clean ? prevLap + f * (lap - prevLap) : Nan;
-                        if (clean) EvalSeg(nextIdx - 1);
+                        if (clean) { EvalSeg(nextIdx - 1); if (!double.IsNaN(refCross[nextIdx])) Ahead = cross[nextIdx] < refCross[nextIdx]; }
                         nextIdx++;
                     }
                 }
@@ -165,7 +168,7 @@ namespace SimracingBR
             for (int i = 0; i <= Count; i++) cross[i] = Nan;
             cross[0] = fromLine ? 0 : Nan;
             nextIdx = fromLine ? 1 : IndexAfter(pos);
-            clean = fromLine; sawWrap = fromLine; lapValid = t.LapValid; transCount = 0;
+            clean = fromLine; sawWrap = fromLine; lapValid = t.LapValid; transCount = 0; Ahead = false;
             prevSector = t.Sector;
         }
 
@@ -273,7 +276,7 @@ namespace SimracingBR
                 if (double.IsNaN(bestSec[m]) || s < bestSec[m]) bestSec[m] = s;
                 if (newRef) refSec[m] = s;
             }
-            if (newRef) refTotal = total;
+            if (newRef) { refTotal = total; Array.Copy(cross, refCross, cross.Length); }
         }
     }
 }

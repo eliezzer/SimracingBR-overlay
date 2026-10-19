@@ -92,9 +92,9 @@ namespace SimracingBR
                 double x = PAD + m * (secW + SEC_GAP);
                 bool current = k.HasPosition && k.CurSec == m;
                 Color hc = Shown(secShown, m, k.Sec[m], k.SecStamp[m]);
-                dc.DrawRoundedRectangle(Grad(hc), null, new Rect(x, barY, secW, HEAD_H), 3, 3);
+                dc.DrawRoundedRectangle(Grad(hc, 0.45, 0.50), null, new Rect(x, barY, secW, HEAD_H), 3, 3);
                 bool lit = k.Sec[m] != SegState.None || Luma(hc) > 110;
-                Brush ink = lit ? Chrome.Br(255, 10, 10, 10) : (current ? white : Chrome.Br(255, 200, 200, 208));
+                Brush ink = k.Sec[m] == SegState.Purple ? white : (lit ? Chrome.Br(255, 10, 10, 10) : (current ? white : Chrome.Br(255, 200, 200, 208)));
                 Chrome.Text(this, dc, "S" + (m + 1), 14, ink, true, x + secW / 2, barY + (HEAD_H - 14 * 1.25) / 2, 1);
                 if (ShowSectorTimes && !double.IsNaN(k.SecMs[m]) && secW >= 110)
                     Chrome.Text(this, dc, (k.SecMs[m] / 1000).ToString("0.000", CultureInfo.InvariantCulture), 11,
@@ -125,9 +125,9 @@ namespace SimracingBR
         }
 
         // vertical gradient, lighter on top and darker at the bottom (the glossy look of the CMRT sectors)
-        static Brush Grad(Color c)
+        static Brush Grad(Color c, double up = 0.30, double down = 0.32)
         {
-            var b = new LinearGradientBrush(Chrome.Mix(c, Colors.White, 0.30), Chrome.Mix(c, Colors.Black, 0.32), 90);
+            var b = new LinearGradientBrush(Chrome.Mix(c, Colors.White, up), Chrome.Mix(c, Colors.Black, down), 90);
             b.Freeze(); return b;
         }
 
@@ -138,7 +138,8 @@ namespace SimracingBR
         {
             int best = T.BestLapMs > 0 ? T.BestLapMs : Tracker.OwnBestMs;
             int last = T.LastLapMs > 0 ? T.LastLapMs : Tracker.OwnLastMs;
-            Item(dc, PAD + 4, PAD, L.T("CURRENT", "ATUAL"), Chrome.Time(T.LapMs), white);
+            Brush cur = !T.LapValid ? Chrome.Br(255, 255, 70, 60) : (Tracker.Ahead ? Chrome.Br(Chrome.Mix(CPurple, Colors.White, 0.25)) : white);   // red = invalid lap, purple = ahead of the best lap
+            Item(dc, PAD + 4, PAD, L.T("CURRENT", "ATUAL"), Chrome.Time(T.LapMs), cur);
             Item(dc, PAD + TIME_COL + 4, PAD, L.T("BEST", "MELHOR"), Chrome.Time(best), white);
             Item(dc, PAD + 4, PAD + TIME_ROW, L.T("LAST", "ÚLTIMA"), Chrome.Time(last), white);
             if (ShowLeader && T.HasLeader) Item(dc, PAD + TIME_COL + 4, PAD + TIME_ROW, L.T("LEADER", "LÍDER"), Chrome.Time(T.LeaderBestMs), white);
