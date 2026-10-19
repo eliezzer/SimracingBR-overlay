@@ -8,7 +8,7 @@ namespace SimracingBR
 {
     public class SectorsView : FrameworkElement, IOverlayView
     {
-        const double PAD = 12, VGAP = 8, SEC_GAP = 8, HEAD_H = 28, SUB_H = 12, SUB_GAP = 3, HEAD_SUB_GAP = 4;
+        const double PAD = 12, VGAP = 8, SEC_GAP = 8, HEAD_H = 22, SUB_H = 12, SUB_GAP = 3, HEAD_SUB_GAP = 4;
         const double TIME_COL = 150, TIME_ROW = 30, LF = 12, VF = 19;     // label / value font sizes
         const int FLASH_MS = 450;
 
@@ -92,10 +92,10 @@ namespace SimracingBR
                 double x = PAD + m * (secW + SEC_GAP);
                 bool current = k.HasPosition && k.CurSec == m;
                 Color hc = Shown(secShown, m, k.Sec[m], k.SecStamp[m]);
-                dc.DrawRoundedRectangle(Chrome.Br(hc), null, new Rect(x, barY, secW, HEAD_H), 3, 3);
+                dc.DrawRoundedRectangle(Grad(hc), null, new Rect(x, barY, secW, HEAD_H), 3, 3);
                 bool lit = k.Sec[m] != SegState.None || Luma(hc) > 110;
                 Brush ink = lit ? Chrome.Br(255, 10, 10, 10) : (current ? white : Chrome.Br(255, 200, 200, 208));
-                Chrome.Text(this, dc, "S" + (m + 1), 15, ink, true, x + secW / 2, barY + (HEAD_H - 15 * 1.25) / 2, 1);
+                Chrome.Text(this, dc, "S" + (m + 1), 14, ink, true, x + secW / 2, barY + (HEAD_H - 14 * 1.25) / 2, 1);
                 if (ShowSectorTimes && !double.IsNaN(k.SecMs[m]) && secW >= 110)
                     Chrome.Text(this, dc, (k.SecMs[m] / 1000).ToString("0.000", CultureInfo.InvariantCulture), 11,
                         lit ? Chrome.Br(255, 10, 10, 10) : gray, false, x + secW - 6, barY + (HEAD_H - 11 * 1.25) / 2, 2);
@@ -107,7 +107,7 @@ namespace SimracingBR
                     int i = m * subs + j;
                     double sx = x + j * (subW + SUB_GAP);
                     Color c = Shown(segShown, i, k.Seg[i], k.SegStamp[i]);
-                    dc.DrawRoundedRectangle(Chrome.Br(c), null, new Rect(sx, sy, subW, SUB_H), 2, 2);
+                    dc.DrawRoundedRectangle(Grad(c), null, new Rect(sx, sy, subW, SUB_H), 2, 2);
                     if (k.HasPosition && k.CurSeg == i)
                     {
                         // the car is here: pulsing outline and a bar growing through the cell
@@ -122,6 +122,13 @@ namespace SimracingBR
 
             if (Unlocked) Chrome.UnlockedBanner(this, dc, Width, Height);
             Chrome.LockButton(this, dc, Unlocked, Hover);
+        }
+
+        // vertical gradient, lighter on top and darker at the bottom (the glossy look of the CMRT sectors)
+        static Brush Grad(Color c)
+        {
+            var b = new LinearGradientBrush(Chrome.Mix(c, Colors.White, 0.30), Chrome.Mix(c, Colors.Black, 0.32), 90);
+            b.Freeze(); return b;
         }
 
         static double Luma(Color c) { return 0.3 * c.R + 0.59 * c.G + 0.11 * c.B; }
