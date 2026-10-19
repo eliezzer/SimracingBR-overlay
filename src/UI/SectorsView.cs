@@ -17,7 +17,7 @@ namespace SimracingBR
         public bool Unlocked { get; set; }
         public bool Hover { get; set; }
         public bool ShowTimes = true, ShowLeader = true, ShowSectorTimes = true;
-        public Color CPurple = Color.FromRgb(177, 77, 255), CGreen = Color.FromRgb(51, 214, 138), CYellow = Color.FromRgb(255, 224, 0);
+        public Color CPurple = Color.FromRgb(177, 77, 255), CGreen = Color.FromRgb(51, 214, 138), CSlower = Color.FromRgb(98, 98, 108);
 
         // colors the cells are fading to / from (the same easing idea as the ABS / TC chips)
         Color[] segShown = new Color[0], secShown = new Color[0];
@@ -61,7 +61,7 @@ namespace SimracingBR
             {
                 case SegState.Purple: return CPurple;
                 case SegState.Green: return CGreen;
-                case SegState.Yellow: return CYellow;
+                case SegState.Slower: return CSlower;
                 default: return idle;
             }
         }
@@ -93,12 +93,11 @@ namespace SimracingBR
                 bool current = k.HasPosition && k.CurSec == m;
                 Color hc = Shown(secShown, m, k.Sec[m], k.SecStamp[m]);
                 dc.DrawRoundedRectangle(Grad(hc, 0.45, 0.50), null, new Rect(x, barY, secW, HEAD_H), 3, 3);
-                bool lit = k.Sec[m] != SegState.None || Luma(hc) > 110;
-                Brush ink = k.Sec[m] == SegState.Purple ? white : (lit ? Chrome.Br(255, 10, 10, 10) : (current ? white : Chrome.Br(255, 200, 200, 208)));
+                Brush ink = k.Sec[m] == SegState.Green ? Chrome.Br(255, 10, 10, 10) : (k.Sec[m] == SegState.Purple || current ? white : Chrome.Br(255, 200, 200, 208));
                 Chrome.Text(this, dc, "S" + (m + 1), 14, ink, true, x + secW / 2, barY + (HEAD_H - 14 * 1.25) / 2, 1);
                 if (ShowSectorTimes && !double.IsNaN(k.SecMs[m]) && secW >= 110)
                     Chrome.Text(this, dc, (k.SecMs[m] / 1000).ToString("0.000", CultureInfo.InvariantCulture), 11,
-                        lit ? Chrome.Br(255, 10, 10, 10) : gray, false, x + secW - 6, barY + (HEAD_H - 11 * 1.25) / 2, 2);
+                        ink, false, x + secW - 6, barY + (HEAD_H - 11 * 1.25) / 2, 2);
                 if (current) dc.DrawRectangle(Chrome.Br(255, 225, 6, 0), null, new Rect(x, barY + HEAD_H - 2, secW, 2));
 
                 double sy = barY + HEAD_H + HEAD_SUB_GAP;

@@ -302,9 +302,9 @@ namespace SimracingBR
             AddAppearance(root, sectors);
 
             AddSection(root, L.T("COLORS", "CORES"));
-            root.Children.Add(Legend(v.CPurple, L.T("Faster than your best lap and than every other driver", "Mais rápido que a sua melhor volta e que todos os pilotos")));
-            root.Children.Add(Legend(v.CGreen, L.T("Faster than your best lap there, but another driver was faster", "Mais rápido que a sua melhor volta, mas outro piloto foi mais rápido")));
-            root.Children.Add(Legend(v.CYellow, L.T("Slower than your best lap there", "Mais lento que a sua melhor volta no trecho")));
+            root.Children.Add(Legend(v.CPurple, L.T("Fastest of the session (all drivers where the game shows it, else your own best)", "Mais rápido da sessão (de todos os pilotos onde o jogo informa, senão o seu melhor)")));
+            root.Children.Add(Legend(v.CGreen, L.T("Your own best there, but another driver was faster", "O seu melhor no trecho, mas outro piloto foi mais rápido")));
+            root.Children.Add(Legend(v.CSlower, L.T("Slower than your best there", "Mais lento que o seu melhor no trecho")));
             root.Children.Add(Legend(Color.FromRgb(36, 36, 44), L.T("Not driven yet in this lap", "Ainda não passou por aqui nesta volta")));
         }
 

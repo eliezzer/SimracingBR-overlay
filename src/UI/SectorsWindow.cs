@@ -28,7 +28,7 @@ namespace SimracingBR
             // same palette as the pedals overlay: green / yellow are the throttle and TC colors
             view.CPurple = s.Col("ColorSecPurple", "#B14DFF");
             view.CGreen = s.Col("ColorSecGreen", s.Str("ColorThrottle", "#33D68A"));
-            view.CYellow = s.Col("ColorSecYellow", s.Str("ColorTc", "#FFE000"));
+            view.CSlower = s.Col("ColorSecSlower", "#62626C");
             var w = new SectorsWindow(s, view, live, demo);
             w.LoadFlags();
             return w;
