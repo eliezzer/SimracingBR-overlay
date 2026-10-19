@@ -61,7 +61,7 @@ namespace SimracingBR
         public static void Prime(SectorTracker tracker)
         {
             var t = new Tele();
-            for (double s = 0; s < WarmUp; s += 1.0 / 30) { Fill(t, s); tracker.Update(t); }
+            for (double s = 0; s < WarmUp; s += 1.0 / 30) { Fill(t, s); tracker.Update(t, s * 1000); }
         }
 
         // The demo is a pure function of the time in seconds. Sub-sector times change from lap to lap: the position on the

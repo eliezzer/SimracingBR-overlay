@@ -34,18 +34,32 @@ namespace SimracingBR
             return rc;
         }
 
-        // Writes probe.log for ~40 s: raw values from every supported game so offsets/units can be verified.
+        // Writes probe.log for 5 minutes: raw values from every supported game so offsets/units can be verified,
+        // plus what the sectors tracker makes of them (drive a few laps while it runs).
         static int Probe(string dir)
         {
-            var games = new GameSources(new Settings(Path.Combine(dir, "settings.ini"))); var t = new Tele();
+            var cfg = new Settings(Path.Combine(dir, "settings.ini"));
+            var games = new GameSources(cfg); var t = new Tele();
+            var trk = new SectorTracker(null, 8);
             using (var w = new StreamWriter(Path.Combine(dir, "probe.log"), false))
             {
-                var end = DateTime.UtcNow.AddSeconds(40);
+                var end = DateTime.UtcNow.AddSeconds(300);
+                int n = 0;
                 while (DateTime.UtcNow < end)
                 {
-                    w.WriteLine(DateTime.Now.ToString("HH:mm:ss.fff") + " " + games.Probe(t));
-                    w.Flush();
-                    System.Threading.Thread.Sleep(250);
+                    if (n++ % 5 == 0) w.WriteLine(DateTime.Now.ToString("HH:mm:ss.fff") + " " + games.Probe(t));
+                    games.Read(t);
+                    trk.Update(t);
+                    if (n % 5 == 1)
+                    {
+                        w.WriteLine("             tracker: pos=" + t.TrackPos.ToString("0.000", CultureInfo.InvariantCulture) + " lapMs=" + t.LapMs +
+                            " seg=" + trk.CurSeg + " sec=" + trk.CurSec + " pitLane=" + t.InPitLane + " valid=" + t.LapValid +
+                            " clean=" + (trk.Why.Length == 0) + " why='" + trk.Why + "' lapsRecorded=" + trk.LapsDone +
+                            " ownBest=" + trk.OwnBestMs + " ownLast=" + trk.OwnLastMs + " gameBest=" + t.BestLapMs + " gameLast=" + t.LastLapMs +
+                            " bounds=" + (trk.BoundsKnown ? "learned" : "thirds"));
+                        w.Flush();
+                    }
+                    System.Threading.Thread.Sleep(50);
                 }
             }
             return 0;

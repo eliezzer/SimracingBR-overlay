@@ -6,6 +6,7 @@
 //   purple = fastest this segment has ever been driven, green = faster than the same segment on the best lap,
 //   yellow = slower than the best lap, gray = nothing to compare with yet.
 using System;
+using System.Diagnostics;
 using System.Globalization;
 
 namespace SimracingBR
@@ -45,7 +46,7 @@ namespace SimracingBR
         double[] cross;                        // lap time at each boundary, NaN = not timed
         int nextIdx;
         bool clean, lapValid, sawWrap;
-        double prevPos = -1, prevLap, prevMs;
+        double prevPos = -1, prevMs;
         int prevSector = -1, transCount;
         double tr1;
 
@@ -104,42 +105,54 @@ namespace SimracingBR
         }
 
         // ---- per frame ---------------------------------------------------------------------
-        public void Update(Tele t)
+        public string Why = "";                   // why the current lap won't count (shown by --probe)
+        public int LapsDone;                      // laps recorded as references
+        double lapStart;                          // clock value at the start line
+
+        public void Update(Tele t) { Update(t, Stopwatch.GetTimestamp() * 1000.0 / Stopwatch.Frequency); }
+
+        // Segment times are measured with our own clock between frames (the position and the game's lap timer are not
+        // always updated in the same frame, which made laps look broken); the game's lap times are only displayed.
+        public void Update(Tele t, double ms)
         {
             if (!t.Live) return;                      // paused / frozen: keep the lap as it is
             if (t.TrackPos < 0) { HasPosition = false; prevPos = -1; return; }
             HasPosition = true;
-            if (t.TrackId != trackId) NewTrack(t.TrackId);
+            if (t.TrackId.Length > 0 && t.TrackId != trackId)
+            {
+                if (trackId.Length == 0) trackId = t.TrackId;     // the name only became known: keep what we have
+                else NewTrack(t.TrackId);
+            }
 
-            double ms = Environment.TickCount;
             float pos = t.TrackPos;
-            double lap = t.LapMs;
             if (!t.LapValid) lapValid = false;
-            if (t.InPitLane) clean = false;
+            if (t.InPitLane) Unclean("pit lane");
 
             if (prevPos < 0)
             {
-                BeginLap(pos < 0.03f && lap < 5000 && !t.InPitLane, pos, t);
+                BeginLap(pos < 0.03f && !t.InPitLane, pos, t, ms);
+                if (!clean && Why.Length == 0) Why = "joined mid-lap";
             }
             else
             {
                 bool wrap = prevPos > 0.85 && pos < 0.15;
+                if (ms - prevMs > 1000) Unclean("pause or frozen game");
                 if (!wrap) LearnBounds(t, pos);
                 if (wrap)
                 {
-                    double dt = Math.Max(1, ms - prevMs), frac = (1 - prevPos) / ((1 - prevPos) + pos);
-                    double total = prevLap + frac * dt;
+                    double frac = (1 - prevPos) / ((1 - prevPos) + pos), tw = prevMs + frac * (ms - prevMs);
                     if (clean && nextIdx <= Count)
                     {
-                        cross[Count] = total;
+                        cross[Count] = tw - lapStart;
                         EvalSeg(Count - 1);
-                        FinishLap(total);
+                        FinishLap(tw - lapStart);
                     }
-                    BeginLap(!t.InPitLane, pos, t);
+                    BeginLap(!t.InPitLane, pos, t, tw);
+                    if (!clean) Why = "pit lane";
                 }
-                else if (pos < prevPos - 0.02 || pos > prevPos + 0.2 || lap < prevLap - 500)
+                else if (pos < prevPos - 0.02 || pos > prevPos + 0.2)
                 {
-                    clean = false;                    // teleport, rewind, restart: this lap won't count
+                    Unclean("position jump");         // teleport, rewind, restart: this lap won't count
                     nextIdx = IndexAfter(pos);
                 }
                 else
@@ -149,13 +162,13 @@ namespace SimracingBR
                     {
                         double f = pos > prevPos ? (bound[nextIdx] - prevPos) / (pos - prevPos) : 1;
                         f = Math.Max(0, Math.Min(1, f));
-                        cross[nextIdx] = clean ? prevLap + f * (lap - prevLap) : Nan;
+                        cross[nextIdx] = clean ? prevMs + f * (ms - prevMs) - lapStart : Nan;
                         if (clean) { EvalSeg(nextIdx - 1); if (!double.IsNaN(refCross[nextIdx])) Ahead = cross[nextIdx] < refCross[nextIdx]; }
                         nextIdx++;
                     }
                 }
             }
-            prevPos = pos; prevLap = lap; prevMs = ms;
+            prevPos = pos; prevMs = ms;
 
             CurSeg = Math.Max(0, Math.Min(Count - 1, IndexAfter(pos) - 1));
             CurSec = CurSeg / Subs;
@@ -163,12 +176,16 @@ namespace SimracingBR
             Progress = b > a ? (float)Math.Max(0, Math.Min(1, (pos - a) / (b - a))) : 0;
         }
 
-        void BeginLap(bool fromLine, float pos, Tele t)
+        void Unclean(string why) { if (clean) Why = why; clean = false; }
+
+        void BeginLap(bool fromLine, float pos, Tele t, double start)
         {
             for (int i = 0; i <= Count; i++) cross[i] = Nan;
             cross[0] = fromLine ? 0 : Nan;
+            lapStart = start;
             nextIdx = fromLine ? 1 : IndexAfter(pos);
             clean = fromLine; sawWrap = fromLine; lapValid = t.LapValid; transCount = 0; Ahead = false;
+            if (fromLine) Why = "";
             prevSector = t.Sector;
         }
 
@@ -257,6 +274,7 @@ namespace SimracingBR
         void FinishLap(double total)
         {
             if (total <= 0) return;
+            if (lapValid && clean) LapsDone++;
             OwnLastMs = (int)total;
             if (!lapValid) return;
             for (int i = 0; i <= Count; i++) if (double.IsNaN(cross[i])) return;

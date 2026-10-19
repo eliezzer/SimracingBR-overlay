@@ -11,6 +11,7 @@ namespace SimracingBR
         public const int DefaultSubs = 8;
 
         public readonly SectorsView View;
+        readonly System.Diagnostics.Stopwatch demoClock = System.Diagnostics.Stopwatch.StartNew();
         readonly SectorTracker live, demoTracker;      // the demo (settings preview) never touches the real records
 
         SectorsWindow(Settings s, SectorsView view, SectorTracker live, SectorTracker demo)
@@ -68,7 +69,7 @@ namespace SimracingBR
         {
             SectorTracker k = demo ? demoTracker : live;
             if (View.Tracker != k) { View.Tracker = k; View.Relayout(); }
-            k.Update(t);
+            if (demo) k.Update(t, DemoSource.WarmUp * 1000 + demoClock.ElapsedMilliseconds); else k.Update(t);
             if (Visibility == Visibility.Visible) View.InvalidateVisual();
         }
     }
