@@ -94,7 +94,7 @@ namespace SimracingBR
         void DrawSuggested(DrawingContext dc, double x, double y, double w)
         {
             dc.DrawRoundedRectangle(Chrome.Br(10, 255, 255, 255), null, new Rect(x, y, w, SUG_H), 3, 3);
-            Chrome.Text(this, dc, L.T("RACE FUEL", "COMBUSTÍVEL DA CORRIDA"), FL, gray, true, x + 10, y + 11, 0);
+            Chrome.Text(this, dc, L.T("SUGGESTED RACE FUEL", "COMBUSTÍVEL SUGERIDO"), FL, gray, true, x + 10, y + 11, 0);
             string val = M.RaceFuel < 0 ? "--" : M.RaceFuel.ToString("0.0", CultureInfo.InvariantCulture) + " L";
             Chrome.Text(this, dc, val, 24, M.RaceFuel < 0 ? white : amber, true, x + w - 10, y + 5, 2);
             string sub;
