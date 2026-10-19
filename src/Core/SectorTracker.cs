@@ -34,6 +34,7 @@ namespace SimracingBR
         public int OwnBestMs, OwnLastMs;       // lap times seen by the tracker (used when the game doesn't publish them)
 
         // references
+        bool alone = true;                     // you are the only driver in the session (or the game does not say)
         int[] othersSec = new int[Main];       // best main-sector times of all drivers (ms, 0 = the game doesn't say)
         double[] secT, secBest;                // what each main sector was scored with (to score it again)
         int wrapTick; bool pendingClear;       // crossing of the finish line: colors go back to gray after HoldMs
@@ -130,6 +131,7 @@ namespace SimracingBR
 
             float pos = t.TrackPos;
             for (int m = 0; m < Main; m++) othersSec[m] = t.SessionBestSecMs[m];
+            alone = t.Drivers <= 1;                   // unknown counts as alone
             if (!t.LapValid) lapValid = false;
             if (t.InPitLane) Unclean("pit lane");
 
@@ -266,10 +268,11 @@ namespace SimracingBR
         //   dark   = not driven yet in this lap.
         // The first time through a stretch is a record. `best` already contains the time being scored, so equal means "is the best".
         // `others` = the best time of all drivers on that stretch, 0 when the game doesn't publish it.
-        static SegState Classify(double t, double best, double others)
+        static SegState Classify(double t, double best, double others, bool alone)
         {
             if (t > best + 2) return SegState.Slower;                            // within 2 ms counts as equal
-            return others <= 0 || t <= others + 30 ? SegState.Purple : SegState.Green;   // our clock and the game's differ by a few ms
+            if (others > 0) return t <= others + 30 ? SegState.Purple : SegState.Green;   // our clock and the game's differ by a few ms
+            return alone ? SegState.Purple : SegState.Green;      // nobody else to compare with: only when you are alone is your best the best
         }
 
         static void Record(ref double best, double t) { if (double.IsNaN(best) || t < best) best = t; }
@@ -281,7 +284,7 @@ namespace SimracingBR
             if (double.IsNaN(a) || double.IsNaN(b) || b <= a) return;
             int now = Environment.TickCount;
             Record(ref bestSeg[i], b - a);
-            SegMs[i] = b - a; Seg[i] = Classify(b - a, bestSeg[i], 0); SegStamp[i] = now;
+            SegMs[i] = b - a; Seg[i] = Classify(b - a, bestSeg[i], 0, alone); SegStamp[i] = now;
             if ((i + 1) % Subs == 0)
             {
                 int m = i / Subs;
@@ -289,7 +292,7 @@ namespace SimracingBR
                 if (secBad || double.IsNaN(s0) || b <= s0) return;
                 Record(ref bestSec[m], b - s0);
                 secT[m] = b - s0; secBest[m] = bestSec[m];
-                SecMs[m] = secT[m]; Sec[m] = Classify(secT[m], secBest[m], othersSec[m]); SecStamp[m] = now;
+                SecMs[m] = secT[m]; Sec[m] = Classify(secT[m], secBest[m], othersSec[m], alone); SecStamp[m] = now;
             }
         }
 
@@ -299,7 +302,7 @@ namespace SimracingBR
         void Rescore()
         {
             for (int m = 0; m < Main; m++)
-                if (!double.IsNaN(secT[m]) && Sec[m] != SegState.None) Sec[m] = Classify(secT[m], secBest[m], othersSec[m]);
+                if (!double.IsNaN(secT[m]) && Sec[m] != SegState.None) Sec[m] = Classify(secT[m], secBest[m], othersSec[m], alone);
             if (pendingClear && (CurSeg >= 1 || Environment.TickCount - wrapTick >= HoldMs))
             {
                 pendingClear = false;

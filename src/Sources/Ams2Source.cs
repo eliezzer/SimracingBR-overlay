@@ -181,7 +181,7 @@ namespace SimracingBR
             t.BestLapMs = LapOrZero((long)(F(BESTLAP) * 1000));
             t.LastLapMs = LapOrZero((long)(F(LASTLAP) * 1000));
             t.HasLeader = true; t.LeaderBestMs = 0; t.LeaderLastMs = 0;
-            t.SessionBestMs = 0; Array.Clear(t.SessionBestSecMs, 0, 3);
+            t.SessionBestMs = 0; Array.Clear(t.SessionBestSecMs, 0, 3); t.Drivers = n;
             for (int i = 0; i < n; i++)
             {
                 if (Pages[0][PART + i * PART_LEN + P_ACTIVE] == 0) continue;

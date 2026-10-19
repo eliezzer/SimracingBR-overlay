@@ -254,7 +254,7 @@ namespace SimracingBR
         // times a second, so the position is dead-reckoned from the telemetry speed in between.
         void FillLaps(Tele t, double et, int nVeh)
         {
-            t.TrackPos = -1; t.InPitLane = false; t.HasLeader = true; t.LeaderBestMs = 0; t.LeaderLastMs = 0; t.SessionBestMs = 0; Array.Clear(t.SessionBestSecMs, 0, 3);
+            t.TrackPos = -1; t.InPitLane = false; t.HasLeader = true; t.LeaderBestMs = 0; t.LeaderLastMs = 0; t.SessionBestMs = 0; Array.Clear(t.SessionBestSecMs, 0, 3); t.Drivers = nVeh;
             t.Sector = BitConverter.ToInt32(tb, T_SECTOR);
             t.LapValid = tb[T_LAPINV] == 0;
             t.TrackId = Str(tb, T_TRACK, 64, false) + "|" + Str(tb, T_VEHNAME, 64, false);

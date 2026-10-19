@@ -69,7 +69,7 @@ namespace SimracingBR
         static readonly int G_STATUS = G("status"), G_LAPMS = G("iCurrentTime"), G_INPIT = G("isInPit"), G_PITLANE = G("isInPitLane"),
             G_SETUP = G("isSetupMenuVisible"), G_TC = G("TC"), G_TCCUT = G("TCCut"), G_ABS = G("ABS"),
             G_FUELLAP = G("fuelXLap"), G_LAPSLEFT = G("fuelEstimatedLaps"), G_LAPS = G("completedLaps"),
-            G_NPOS = G("normalizedCarPosition"), G_SECTOR = G("currentSectorIndex"), G_LAST = G("iLastTime"), G_BEST = G("iBestTime"), G_VALID = G("isValidLap");
+            G_DRIVERS = G("activeCars"), G_NPOS = G("normalizedCarPosition"), G_SECTOR = G("currentSectorIndex"), G_LAST = G("iLastTime"), G_BEST = G("iBestTime"), G_VALID = G("isValidLap");
         static readonly int GFX_LEN = G("fuelEstimatedLaps") + 4;
         static readonly int S_MAXRPM = S("maxRpm"), S_MAXFUEL = S("maxFuel"), S_SMVER = S("smVersion"), S_TRACK = S("track"), S_CAR = S("carModel");
         static readonly int STATIC_LEN = S("maxFuel") + 4;
@@ -126,6 +126,7 @@ namespace SimracingBR
             t.LastLapMs = LapOrZero(BitConverter.ToInt32(gb, G_LAST));
             t.BestLapMs = LapOrZero(BitConverter.ToInt32(gb, G_BEST));
             t.HasLeader = false; Array.Clear(t.SessionBestSecMs, 0, 3);
+            t.Drivers = BitConverter.ToInt32(gb, G_DRIVERS);
             t.TrackId = Str(sb, S_TRACK, 66, true) + "|" + Str(sb, S_CAR, 66, true);
             if (float.IsNaN(t.Fuel) || t.Fuel < 0 || t.Fuel > 1000) t.Fuel = 0;
             if (float.IsNaN(t.FuelPerLap) || t.FuelPerLap < 0 || t.FuelPerLap > 100) t.FuelPerLap = 0;

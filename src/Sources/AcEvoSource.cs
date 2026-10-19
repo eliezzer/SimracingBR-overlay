@@ -82,7 +82,7 @@ namespace SimracingBR
             G_FUELLAP = G("fuelLiterPerLap"), G_LAPMS = G("currentLapTimeMs"), G_LAPSPOSS = G("lapsPossibleWithFuel"),
             G_RPM = G("rpm"), G_ELEC = G("electronics"), G_SHIFTUP = G("isChangeUp"),
             G_CLUTCHPCT = G("clutchPercent"), G_STATUS = G("status"), G_PITBOX = G("isInPitBox"), G_PITLANE = G("isInPitLane"), G_LOCATION = G("carLocation"),
-            G_NPOS = G("npos"), G_LASTLAP = G("lastLaptimeMs"), G_BESTLAP = G("bestLaptimeMs"), G_VALID = G("isValidLap"), G_CAR = G("carModel");
+            G_DRIVERS = G("totalDrivers"), G_NPOS = G("npos"), G_LASTLAP = G("lastLaptimeMs"), G_BESTLAP = G("bestLaptimeMs"), G_VALID = G("isValidLap"), G_CAR = G("carModel");
         static readonly int GFX_LEN = G("isValidLap") + 1;
 
         DateTime lastChange = DateTime.MinValue;
@@ -132,6 +132,7 @@ namespace SimracingBR
             t.LastLapMs = LapOrZero(BitConverter.ToInt32(gb, G_LASTLAP));
             t.BestLapMs = LapOrZero(BitConverter.ToInt32(gb, G_BESTLAP));
             t.HasLeader = false; Array.Clear(t.SessionBestSecMs, 0, 3);
+            t.Drivers = (int)BitConverter.ToUInt32(gb, G_DRIVERS);
             t.TrackId = Str(Pages[2], S_TRACK, 32, false) + "/" + Str(Pages[2], S_LAYOUT, 32, false) + "|" + Str(gb, G_CAR, 33, false);
             if (float.IsNaN(t.Fuel) || t.Fuel < 0 || t.Fuel > 1000) t.Fuel = 0;
             if (float.IsNaN(t.FuelPerLap) || t.FuelPerLap < 0 || t.FuelPerLap > 100) t.FuelPerLap = 0;
