@@ -1,4 +1,4 @@
-// The application: owns the telemetry, the overlays (pedals, sectors), the tray icon, the hotkeys and the settings window.
+// The application: owns the telemetry, the overlays (pedals, sectors, fuel, electronics, tyres), the tray icon, the hotkeys and the settings window.
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -30,6 +30,10 @@ namespace SimracingBR
         readonly DemoSource demo = new DemoSource();
         readonly PedalsWindow pedals;
         readonly SectorsWindow sectors;
+        readonly FuelWindow fuel;
+        readonly ElecWindow elec;
+        // readonly TyreWindow tyre;          // tyre overlay: switched off for now, it is not working well yet (see TyreWindow.cs)
+        readonly HashSet<OverlayWindow> beta;   // overlays shown with a BETA label
         readonly OverlayWindow[] overlays;
         readonly DispatcherTimer timer = new DispatcherTimer(DispatcherPriority.Render);
         HwndSource hotkeys;            // message-only window: the hotkeys work whichever overlays are on
@@ -61,7 +65,11 @@ namespace SimracingBR
 
             pedals = PedalsWindow.Create(s, dir, tele);
             sectors = SectorsWindow.Create(s, tele);
-            overlays = new OverlayWindow[] { pedals, sectors };
+            fuel = FuelWindow.Create(s, tele);
+            elec = ElecWindow.Create(s, tele);
+            // tyre = TyreWindow.Create(s, tele);
+            overlays = new OverlayWindow[] { pedals, sectors, fuel, elec /*, tyre */ };
+            beta = new HashSet<OverlayWindow> { sectors, fuel };
             lastTarget = pedals;
             foreach (OverlayWindow w in overlays)
             {
@@ -178,7 +186,10 @@ namespace SimracingBR
 
             var header = new StackPanel();
             var title = new TextBlock { FontSize = 20, FontWeight = FontWeights.Bold };
-            header.Children.Add(title);
+            var titleBeta = BetaBadge(true);
+            var titleRow = new StackPanel { Orientation = Orientation.Horizontal };
+            titleRow.Children.Add(title); titleRow.Children.Add(titleBeta);
+            header.Children.Add(titleRow);
             header.Children.Add(new TextBlock
             {
                 Text = L.T("Changes apply instantly. The overlays show demo data while this window is open.",
@@ -205,6 +216,7 @@ namespace SimracingBR
                     rows[i].BorderBrush = i == idx ? Accent : Brushes.Transparent;
                 }
                 title.Text = overlays[idx].Title2;
+                titleBeta.Visibility = beta.Contains(overlays[idx]) ? Visibility.Visible : Visibility.Collapsed;
                 scroll.ScrollToTop();
             };
             for (int i = 0; i < overlays.Length; i++)
@@ -215,7 +227,10 @@ namespace SimracingBR
                 var sw = Switch(() => o.Enabled, v => { o.SetEnabled(v); miOn[o].Checked = v; });
                 DockPanel.SetDock(sw, Dock.Right);
                 line.Children.Add(sw);
-                line.Children.Add(new TextBlock { Text = o.Title2, FontSize = 14, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
+                var nameBox = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+                nameBox.Children.Add(new TextBlock { Text = o.Title2, FontSize = 14, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
+                if (beta.Contains(o)) nameBox.Children.Add(BetaBadge(false));
+                line.Children.Add(nameBox);
                 rows[i] = new Border { Child = line, Padding = new Thickness(15, 12, 14, 12), BorderThickness = new Thickness(3, 0, 0, 0), Cursor = Cursors.Hand, Background = Brushes.Transparent };
                 rows[i].MouseLeftButtonUp += delegate { select(idx); };
                 side.Children.Add(rows[i]);
@@ -224,12 +239,15 @@ namespace SimracingBR
             }
             BuildPedalsPage(pages[0]);
             BuildSectorsPage(pages[1]);
+            BuildFuelPage(pages[2]);
+            BuildElecPage(pages[3]);
+            // BuildTyrePage(pages[4]);
 
             var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0) };
             var reset = new Button { Content = L.T("Reset this overlay", "Restaurar este overlay"), Padding = new Thickness(12, 5, 12, 5), Margin = new Thickness(0, 0, 8, 0) };
             reset.Click += delegate
             {
-                if (selected == 0) pedals.ResetDefaults(); else sectors.ResetDefaults();
+                if (selected == 0) pedals.ResetDefaults(); else if (selected == 1) sectors.ResetDefaults(); else if (selected == 2) fuel.ResetDefaults(); else elec.ResetDefaults();   // else tyre.ResetDefaults();
                 foreach (Action r in refreshers) r();
             };
             var close = new Button { Content = L.T("Close", "Fechar"), Padding = new Thickness(18, 5, 18, 5), IsDefault = true };
@@ -271,6 +289,7 @@ namespace SimracingBR
             AddCheck(root, L.T("Pedal bars", "Barras dos pedais"), "ShowBars", () => v.ShowBars, x => v.ShowBars = x, after);
             AddCheck(root, L.T("Clutch (bar and graph line)", "Embreagem (barra e linha do gráfico)"), "ShowClutch", () => v.ShowClutch, x => v.ShowClutch = x, after);
             AddCheck(root, L.T("ABS / TC levels and activity", "Níveis e atuação de ABS / TC"), "ShowAids", () => v.ShowAids, x => v.ShowAids = x, after);
+            AddCheck(root, L.T("Brake bias (when the game publishes it)", "Balança de freio (quando o jogo publica)"), "ShowBias", () => v.ShowBias, x => v.ShowBias = x, after);
 
             AddSection(root, L.T("DASH", "PAINEL"));
             AddCheck(root, L.T("Gear", "Marcha"), "ShowGear", () => v.ShowGear, x => v.ShowGear = x, after);
@@ -309,6 +328,153 @@ namespace SimracingBR
             root.Children.Add(Legend(Color.FromRgb(36, 36, 44), L.T("Not driven yet in this lap", "Ainda não passou por aqui nesta volta")));
         }
 
+        // small "BETA" label: the overlay works but is still being tuned
+        static UIElement BetaBadge(bool big)
+        {
+            var amber = new SolidColorBrush(Color.FromRgb(255, 200, 0));
+            return new Border
+            {
+                Child = new TextBlock { Text = "BETA", FontSize = big ? 11 : 9, FontWeight = FontWeights.Bold, Foreground = amber },
+                BorderBrush = amber, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(3),
+                Padding = new Thickness(big ? 6 : 5, 1, big ? 6 : 5, 1), Margin = new Thickness(big ? 10 : 8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center
+            };
+        }
+
+        string MenuName(OverlayWindow o) { return o.Title2 + (beta.Contains(o) ? " (beta)" : ""); }
+
+
+        // where an overlay is shown: on the track, on the game's setup screen, or both
+        void AddVisChoice(Panel p, OverlayWindow o)
+        {
+            AddSection(p, L.T("WHEN TO SHOW", "QUANDO MOSTRAR"));
+            string[] names = { L.T("On track", "Na pista"), L.T("Setup screen", "Tela de setup"), L.T("Both", "Os dois") };
+            var row = new Grid { Margin = new Thickness(0, 6, 0, 0) };
+            var cells = new Border[3];
+            for (int i = 0; i < 3; i++)
+            {
+                int idx = i;
+                row.ColumnDefinitions.Add(new ColumnDefinition());
+                var tb = new TextBlock { Text = names[i], FontWeight = FontWeights.SemiBold, FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center };
+                cells[i] = new Border { Child = tb, Padding = new Thickness(0, 7, 0, 7), Cursor = Cursors.Hand, BorderThickness = new Thickness(1), Margin = new Thickness(i == 0 ? 0 : 4, 0, 0, 0) };
+                cells[i].MouseLeftButtonUp += delegate { o.SetVisMode(idx); foreach (Action r in refreshers) r(); };
+                Grid.SetColumn(cells[i], i);
+                row.Children.Add(cells[i]);
+            }
+            Action paint = delegate
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    bool on = o.VisMode == i;
+                    cells[i].Background = new SolidColorBrush(on ? Color.FromRgb(40, 40, 50) : Color.FromRgb(26, 26, 33));
+                    cells[i].BorderBrush = on ? Accent : new SolidColorBrush(Color.FromRgb(50, 50, 58));
+                    ((TextBlock)cells[i].Child).Foreground = on ? Brushes.White : Muted;
+                }
+            };
+            refreshers.Add(paint); paint();
+            p.Children.Add(row);
+            p.Children.Add(new TextBlock
+            {
+                Text = L.T("On the setup screen the overlay appears where you place it (unlock with Ctrl+Shift+L to drag it) and goes away when you leave that screen.",
+                           "Na tela de setup o overlay aparece onde você o posicionar (destrave com Ctrl+Shift+L para arrastar) e some quando você sai dessa tela."),
+                Foreground = Muted, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0)
+            });
+        }
+
+
+        void BuildFuelPage(Panel root)
+        {
+            FuelView v = fuel.View;
+            Action after = fuel.LayoutChanged;
+            AddVisChoice(root, fuel);
+            AddSection(root, L.T("FUEL", "COMBUSTÍVEL"));
+            AddCheck(root, L.T("Fuel in the tank (with a level bar)", "Combustível no tanque (com barra de nível)"), "FuelShowFuel", () => v.ShowFuel, x => v.ShowFuel = x, after);
+            AddCheck(root, L.T("Consumption per lap", "Consumo por volta"), "FuelShowPerLap", () => v.ShowPerLap, x => v.ShowPerLap = x, after);
+            AddCheck(root, L.T("Laps left on the tank", "Voltas restantes no tanque"), "FuelShowLapsLeft", () => v.ShowLapsLeft, x => v.ShowLapsLeft = x, after);
+            AddCheck(root, L.T("Fuel for the whole race (suggestion)", "Combustível para a corrida inteira (sugestão)"), "FuelShowSuggested", () => v.ShowSuggested, x => v.ShowSuggested = x, after);
+
+            AddSection(root, L.T("RACE", "CORRIDA"));
+            root.Children.Add(new TextBlock
+            {
+                Text = L.T("The suggestion is the fuel for the WHOLE race: consumption per lap x the race laps (or the race time divided by your fastest valid lap, remembered from practice and qualifying) plus the margin. Set the race length below, or leave it on auto to use what the game says during the race session.",
+                           "A sugestão é o combustível para a corrida INTEIRA: consumo por volta x voltas da corrida (ou o tempo da corrida dividido pela sua volta válida mais rápida, lembrada do treino e do qualy) mais a margem. Defina a duração da corrida abaixo, ou deixe em automático para usar o que o jogo informa na sessão de corrida."),
+                Foreground = Muted, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0)
+            });
+            AddSlider(root, L.T("Safety margin (laps of fuel)", "Margem de segurança (voltas de combustível)"), 0, 3, 0.5, () => fuel.Margin,
+                x => fuel.SetMargin(x), x => x.ToString("0.0", CultureInfo.InvariantCulture));
+            AddSlider(root, L.T("Race length in laps (auto = what the game says)", "Duração da corrida em voltas (auto = o que o jogo informa)"), 0, 200, 1, () => fuel.RaceLaps,
+                x => fuel.SetRaceLaps((int)Math.Round(x)), x => Math.Round(x) <= 0 ? L.T("auto", "auto") : Math.Round(x).ToString(CultureInfo.InvariantCulture));
+            AddSlider(root, L.T("Race length in minutes (for timed races; auto = what the game says)", "Duração da corrida em minutos (corrida por tempo; auto = o que o jogo informa)"), 0, 240, 5, () => fuel.RaceMinutes,
+                x => fuel.SetRaceMinutes((int)Math.Round(x)), x => Math.Round(x) <= 0 ? L.T("auto", "auto") : Math.Round(x).ToString(CultureInfo.InvariantCulture) + " min");
+
+            AddAppearance(root, fuel);
+        }
+
+        /* Tyre overlay settings page: switched off for now, it is not working well yet.
+        void BuildTyrePage(Panel root)
+        {
+            TyreView v = tyre.View;
+            Action after = tyre.LayoutChanged;
+            AddVisChoice(root, tyre);
+            root.Children.Add(new TextBlock
+            {
+                Text = L.T("After the valid laps asked for, it tells you the COLD pressure to put in the setup so that the hot pressure ends up at the target: target x cold / hot. Example: setup 25.5, hot 27.9 -> 24.7. The cold value is the pressure the car shows at the start of the session, standing in the pits (or the value typed below). Needs a game that publishes tyre pressure (AC EVO, ACC).",
+                           "Depois das voltas válidas pedidas, ele diz a pressão A FRIO para colocar no setup para que a pressão a quente fique no alvo: alvo x frio / quente. Exemplo: setup 25,5, quente 27,9 -> 24,7. O valor a frio é a pressão que o carro mostra no começo da sessão, parado no box (ou o valor digitado abaixo). Precisa de um jogo que publique a pressão dos pneus (AC EVO, ACC)."),
+                Foreground = Muted, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 12, 0, 0)
+            });
+            AddSection(root, L.T("TARGET", "ALVO"));
+            AddSlider(root, L.T("Hot pressure target (psi)", "Pressão alvo a quente (psi)"), 20, 35, 0.1, () => tyre.Target,
+                x => tyre.SetTarget(x), x => x.ToString("0.0", CultureInfo.InvariantCulture));
+            AddSlider(root, L.T("Valid laps before the suggestion", "Voltas válidas antes da sugestão"), 1, 5, 1, () => tyre.LapsNeeded,
+                x => tyre.SetLapsNeeded((int)Math.Round(x)), x => Math.Round(x).ToString(CultureInfo.InvariantCulture));
+            AddSection(root, L.T("SHOW", "MOSTRAR"));
+            AddCheck(root, L.T("Tyre core temperature", "Temperatura do núcleo do pneu"), "TyreShowTemps", () => v.ShowTemps, x => v.ShowTemps = x, after);
+            AddCheck(root, L.T("Suggested cold pressure", "Pressão a frio sugerida"), "TyreShowAdvice", () => v.ShowAdvice, x => v.ShowAdvice = x, after);
+            AddSection(root, L.T("SETUP PRESSURE (OPTIONAL)", "PRESSÃO DO SETUP (OPCIONAL)"));
+            root.Children.Add(new TextBlock
+            {
+                Text = L.T("Only if the overlay can't tell the setup pressure itself (for example you opened it after leaving the pits). 0 = automatic.",
+                           "Só se o overlay não conseguir saber a pressão do setup sozinho (por exemplo, você o abriu depois de sair do box). 0 = automático."),
+                Foreground = Muted, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0)
+            });
+            string[] names = { L.T("Front left", "Dianteiro esquerdo"), L.T("Front right", "Dianteiro direito"), L.T("Rear left", "Traseiro esquerdo"), L.T("Rear right", "Traseiro direito") };
+            for (int i = 0; i < 4; i++)
+            {
+                int w = i;
+                AddSlider(root, names[i], 0, 35, 0.1, () => tyre.ColdOverride(w), x => tyre.SetColdOverride(w, x),
+                    x => x < 0.05 ? L.T("auto", "auto") : x.ToString("0.0", CultureInfo.InvariantCulture));
+            }
+            AddAppearance(root, tyre);
+        }
+        */
+
+
+        void BuildElecPage(Panel root)
+        {
+            ElecView v = elec.View;
+            Action after = elec.LayoutChanged;
+            root.Children.Add(new TextBlock
+            {
+                Text = L.T("Only what the car and the game publish is shown: items the car doesn't have take no space.",
+                           "Só aparece o que o carro e o jogo publicam: o que o carro não tem não ocupa espaço."),
+                Foreground = Muted, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 12, 0, 0)
+            });
+            AddSection(root, L.T("DRIVER AIDS", "AUXÍLIOS"));
+            AddCheck(root, "ABS", "ElecShowAbs", () => v.ShowAbs, x => v.ShowAbs = x, after);
+            AddCheck(root, "TC", "ElecShowTc", () => v.ShowTc, x => v.ShowTc = x, after);
+            AddCheck(root, L.T("TC cut (TCC)", "Corte do TC (TCC)"), "ElecShowTcc", () => v.ShowTcc, x => v.ShowTcc = x, after);
+            AddCheck(root, "ESC", "ElecShowEsc", () => v.ShowEsc, x => v.ShowEsc = x, after);
+            AddSection(root, L.T("CAR SETUP", "AJUSTES DO CARRO"));
+            AddCheck(root, L.T("Brake bias", "Balança de freio"), "ElecShowBias", () => v.ShowBias, x => v.ShowBias = x, after);
+            AddCheck(root, L.T("Engine map", "Mapa do motor"), "ElecShowMap", () => v.ShowMap, x => v.ShowMap = x, after);
+            AddCheck(root, L.T("Differential (power / coast)", "Diferencial (potência / freio motor)"), "ElecShowDiff", () => v.ShowDiff, x => v.ShowDiff = x, after);
+            AddSection(root, L.T("HYBRID / ENERGY", "HÍBRIDO / ENERGIA"));
+            AddCheck(root, L.T("Battery (hybrid / ERS)", "Bateria (híbrido / ERS)"), "ElecShowBattery", () => v.ShowBattery, x => v.ShowBattery = x, after);
+            AddCheck(root, L.T("Virtual energy (LMU)", "Energia virtual (LMU)"), "ElecShowEnergy", () => v.ShowEnergy, x => v.ShowEnergy = x, after);
+            AddCheck(root, "DRS", "ElecShowDrs", () => v.ShowDrs, x => v.ShowDrs = x, after);
+            AddAppearance(root, elec);
+        }
+
+
         static UIElement Legend(Color c, string text)
         {
             var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 0) };
@@ -337,7 +503,7 @@ namespace SimracingBR
         // key "" = the value is not stored by the checkbox itself (set() does it)
         void AddCheck(Panel p, string label, string key, Func<bool> get, Action<bool> set, Action after)
         {
-            var cb = new CheckBox { Content = label, IsChecked = get(), Margin = new Thickness(0, 4, 0, 2), Foreground = Brushes.White };
+            var cb = new CheckBox { Content = new TextBlock { Text = label, TextWrapping = TextWrapping.Wrap, MaxWidth = 410 }, IsChecked = get(), Margin = new Thickness(0, 4, 0, 2), Foreground = Brushes.White };
             RoutedEventHandler h = delegate
             {
                 bool v = cb.IsChecked == true;
@@ -396,11 +562,11 @@ namespace SimracingBR
             foreach (OverlayWindow ov in overlays)
             {
                 OverlayWindow o = ov;
-                var on = new WF.ToolStripMenuItem(o.Title2, null, delegate { o.SetEnabled(!o.Enabled); miOn[o].Checked = o.Enabled; if (settingsWin != null) foreach (Action r in refreshers) r(); });
+                var on = new WF.ToolStripMenuItem(MenuName(o), null, delegate { o.SetEnabled(!o.Enabled); miOn[o].Checked = o.Enabled; if (settingsWin != null) foreach (Action r in refreshers) r(); });
                 on.Checked = o.Enabled;
                 miOn[o] = on; overlaysMenu.DropDownItems.Add(on);
 
-                var sub = new WF.ToolStripMenuItem(o.Title2);
+                var sub = new WF.ToolStripMenuItem(MenuName(o));
                 var items = new List<WF.ToolStripMenuItem>();
                 foreach (int pct in SizePcts)
                 {
@@ -458,8 +624,12 @@ namespace SimracingBR
             }
             pedals.Tick(t, preview || t.HasTcCut);
             sectors.Tick(t, preview);
-            bool want = ShouldShow(t);
-            foreach (OverlayWindow w in overlays) { w.Present(want); w.PollHover(); }
+            fuel.Tick(t);
+            elec.Tick(t);
+            // tyre.Tick(t, preview);
+            bool onTrack = ShouldShow(t), force = !locked || useDemo || settingsOpen;
+            bool inSetup = t.Live && t.InSetup && (!hideUnfocused || GameFocused());
+            foreach (OverlayWindow w in overlays) { w.Present(force || w.WantShown(onTrack, inSetup)); w.PollHover(); }
         }
 
         bool ShouldShow(Tele t)

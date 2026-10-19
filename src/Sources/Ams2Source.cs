@@ -98,9 +98,9 @@ namespace SimracingBR
             SEQ = O("mSequenceNumber"), ABSSET = O("mAntiLockSetting"), TCSET = O("mTractionControlSetting"),
             VIEWED = O("mViewedParticipantIndex"), NUMPART = O("mNumParticipants"), PART = O("mParticipantInfo"),
             TRACKLEN = O("mTrackLength"), BESTLAP = O("mBestLapTime"), LASTLAP = O("mLastLapTime"), INVALID = O("mLapInvalidated"),
-            PTIMES = O("mParticipantTimes"), TRACKLOC = O("mTrackLocation"), TRACKVAR = O("mTrackVariation"), CARNAME = O("mCarName");
+            PTIMES = O("mParticipantTimes"), SESSIONSTATE = O("mSessionState"), LAPSINEVENT = O("mLapsInEvent"), EVENTLEFT = O("mEventTimeRemaining"), BRAKEBIAS = O("mBrakeBias"), DRSSTATE = O("mDrsState"), TRACKLOC = O("mTrackLocation"), TRACKVAR = O("mTrackVariation"), CARNAME = O("mCarName");
         // ParticipantInfo (100 bytes): bool active, char name[64], float worldPos[3], float lapDistance, uint racePosition, ...
-        const int PART_LEN = 100, P_ACTIVE = 0, P_LAPDIST = 80, P_RACEPOS = 84, P_SECTOR = 96, MAXP = 64;
+        const int PART_LEN = 100, P_ACTIVE = 0, P_LAPDIST = 80, P_RACEPOS = 84, P_LAPSDONE = 88, P_SECTOR = 96, MAXP = 64;
         static readonly int LEN = Marshal.SizeOf(typeof(Ams2Shm));
 
         readonly double steerLock;       // AMS2 only gives steering as -1..1; full lock-to-lock rotation in degrees
@@ -154,6 +154,7 @@ namespace SimracingBR
                      : (gs == GAME_INGAME_REPLAY || gs == GAME_FRONT_END_REPLAY) ? 1 : 0;
             uint pit = U(PITMODE);
             t.InPitBox = pit == PIT_MODE_IN_GARAGE || pit == PIT_MODE_IN_PIT;
+            t.InSetup = false;
             t.InPitLane = pit != 0;
             FillLaps(t);
             return true;
@@ -199,6 +200,18 @@ namespace SimracingBR
                 }
             }
             t.TrackId = Str(Pages[0], TRACKLOC, 64, false) + "/" + Str(Pages[0], TRACKVAR, 64, false) + "|" + Str(Pages[0], CARNAME, 64, false);
+            t.ClearExtras();
+            t.FuelCap = F(FUELCAP) > 0 && F(FUELCAP) < 1000 ? F(FUELCAP) : 0;
+            t.SessionIsRace = U(SESSIONSTATE) == 5;
+            uint lapsInEvent = U(LAPSINEVENT);
+            t.SessionLaps = lapsInEvent > 0 && lapsInEvent < 10000 ? (int)lapsInEvent : 0;
+            float left = F(EVENTLEFT);
+            t.SessionTimeLeftMs = left > 0 && left < 360000 ? (int)(left * 1000) : -1;
+            if (vi >= 0 && vi < MAXP) t.LapCount = (int)U(PART + vi * PART_LEN + P_LAPSDONE);
+            float bb = F(BRAKEBIAS);
+            t.BrakeBias = bb > 0.2f && bb < 0.95f ? bb : -1;
+            uint drs = U(DRSSTATE);
+            t.Drs = (drs & 1) == 0 ? -1 : ((drs & 8) != 0 ? 2 : ((drs & 4) != 0 ? 1 : 0));
         }
 
         public override string Probe()

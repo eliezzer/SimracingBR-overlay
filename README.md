@@ -99,3 +99,28 @@ A second overlay (switch it on/off and configure it in **Settings**, next to the
 The games only publish the 3 main sectors, so the overlay times the sub-sectors itself from the lap position and the lap time (every game publishes both). Colors (the way the CMRT app does it in Assetto Corsa 1; they are painted as you drive each stretch and go back to dark after the finish line): **purple** = your time is the best of the session on that stretch (compared with all drivers only where the game publishes their times; in a game that does not, it is purple only while you are the only driver in the session, otherwise your best is green), **green** = your own best there but another driver was faster, **gray** = slower than your best there, **dark** = not driven yet in this lap.
 
 Notes: the main-sector boundaries are learned from the game's sector changes (ACC, LMU, AMS2) and remembered per track in `settings.ini`; AC EVO does not publish the sector, so it uses thirds of the lap. `--probe` now also logs the lap position, sector and lap times; `--dump` (AC EVO) writes a `dump` folder for 5 minutes to look for data about the other drivers. Keys: `SectorsSubs`, `SectorsShowTimes`, `SectorsShowLeader`, `SectorsShowSectorTimes`, `SectorsOpacity`, `SectorsScale`, `PedalsEnabled`, `SectorsEnabled`, `ColorSecPurple` / `ColorSecGreen` / `ColorSecYellow`.
+
+## Fuel and electronics overlays
+
+Two more overlays, off by default (switch them on in **Settings**; the pedals overlay is unchanged):
+
+- **Fuel**: fuel in the tank (with a level bar), consumption per lap, laps left on the tank and the **fuel for the whole race** (never "what to add"). The suggestion is `(race laps + margin) * consumption`, where the race laps are the race's total laps, or the total race time divided by your fastest valid lap on that track and car (remembered between runs, so the qualifying lap counts). Set the race length in laps or minutes in Settings, or leave it on auto: the game only tells it in the race session itself (AC EVO: the session clock at the start of the race), in a solo Race Weekend the race length is read from the game log (`Saved GamesACEogs`, the "game started!" line, read-only) so it is known already in practice and qualifying, and the overlay remembers the last online race it saw, so the total is ready in the next qualifying. Settings: safety margin in laps, race laps, race minutes.
+- **Electronics**: ABS / TC / TCC / ESC chips that light up while the aid acts, plus brake bias, engine map, differential, hybrid battery, virtual energy (LMU) and DRS. Only what the car and the game publish is shown (an AC EVO GT3 shows ABS, TC, brake bias and differential; a hypercar in LMU adds map, battery and energy).
+
+`--probe` logs the values both overlays read (`extras:` line). What each game publishes: AC EVO (race length only as the time left, from the session clock), ACC (laps, time left, engine map, brake bias), LMU (laps, time left, map, brake bias, battery, virtual energy, DRS), AMS2 (laps, time left, brake bias, DRS). Only AC EVO was checked against a real session.
+
+## Tyre pressure overlay (switched off for now)
+
+Not available at the moment: the overlay is commented out in `OverlayApp.cs` until it works well. The code (`TyreModel`, `TyreView`, `TyreWindow`) is kept. What it does: the hot pressure of the four tyres (green within 0.5 psi of the target, amber within 1, red beyond), their core temperature, and, after two valid laps, the **cold pressure to put in the setup** so that the hot pressure ends up at the target (27.0 psi by default).
+
+`advice = target * cold / hot`: the cold pressure is the one the car shows standing in the pits at the start of the session (or what you type in Settings), the hot one is the average over the last valid lap. Example: setup 25.5, hot 27.9 -> 27.0 * 25.5 / 27.9 = 24.7. The out lap and invalid laps don't count; if the pressure is still rising it says so (check again after another lap). Needs a game that publishes the tyre pressure: AC EVO and ACC (physics page, `wheelsPressure` / `tyreCoreTemperature`). Settings: target, number of valid laps, optional setup pressure per wheel.
+
+### Showing the fuel and tyre overlays on the game's setup screen
+
+The fuel and tyre overlays have a **When to show** choice in Settings: on track, on the setup screen, or both (setup screen by default). On the setup screen they appear where you place them (unlock with `Ctrl+Shift+L` to drag) and go away when you leave it, so the numbers are there while you type the setup. How the setup screen is detected: AC EVO (in the pit box, car still, engine off: found with `--probe`, the garage main menu has the engine idling), ACC (`isSetupMenuVisible`), LMU (garage stall). The game's setup files aren't touched.
+
+The **Sectors** and **Fuel** overlays are marked **BETA** in the settings menu and the tray menu: they work, but are still being tuned.
+
+In a **solo Race Weekend** of AC EVO the race length is read from the game's own log (`Saved Games\ACE\Logs\log-*.txt`, the "Game Started!" line; the file is only read) so the fuel overlay knows it already in practice and qualifying. Online servers don't write that line: there the overlay uses your setting, or the last race it saw.
+
+For **online servers** the race length is read from `Saved Games\ACE\last_season.seasondefinition`, the event definition the game rewrites when you join a server (read only). It is a Protocol Buffers file; for AC EVO 0.9.1 the settings of each session are at `25 -> 2 -> 200`: field 3 is the duration in ms of a timed session, field 5 the number of laps of a lap race (seen: 10 minute qualifying = 600000, 10 lap race = 10). Timed races have not been seen yet, so that case is a guess.

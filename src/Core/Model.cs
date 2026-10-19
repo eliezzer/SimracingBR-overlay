@@ -42,6 +42,33 @@ namespace SimracingBR
         public int[] SessionBestSecMs = new int[3]; // fastest main-sector times of anyone in the session (ms, 0 = unknown)
         public int SessionBestMs;                  // fastest lap of anyone in the session, 0 = unknown
         public string TrackId = "";                // track + car: start from scratch when either changes
+        // session / fuel (fuel overlay)
+        public int LapCount = -1;                  // laps the player has completed, -1 = unknown
+        public int SessionLaps;                    // race length in laps, 0 = unknown or time based
+        public int SessionTimeLeftMs = -1;         // time left in the session, -1 = unknown
+        public bool SessionIsRace;
+        public int RaceLengthSec, RaceLengthLaps;   // race length of a solo event read from the game log (any session), 0 = unknown
+        public float FuelCap;                      // tank capacity in litres, 0 = unknown
+        // electronics (electronics overlay), -1 = the car / game doesn't have it
+        public int TcMax = -1, TcCutMax = -1, AbsMax = -1, EscLevel = -1, EscMax = -1, EngineMap = -1, EngineMapMax = -1;
+        public float BrakeBias = -1;               // share of the braking on the FRONT axle, 0..1
+        public float DiffPower = -1, DiffCoast = -1;   // 0..1
+        public float BatteryPct = -1;              // hybrid battery / ERS charge, 0..100
+        public float EnergyPct = -1;               // virtual energy left (LMU hypercars), 0..100
+        public int Drs = -1;                       // -1 none, 0 off, 1 available, 2 open
+        public bool InSetup;                       // the game is showing its car setup screen
+        public float[] TyrePsi = { -1, -1, -1, -1 };      // pressure of each tyre in psi (FL, FR, RL, RR), -1 = unknown
+        public float[] TyreTemp = { -1, -1, -1, -1 };     // core temperature of each tyre in degrees C, -1 = unknown
+        public float[] TyreColdPsi = { -1, -1, -1, -1 };  // the cold / setup pressure when the game publishes it, -1 = unknown
+
+        // forget the optional fuel / electronics values of the previous game or car
+        public void ClearExtras()
+        {
+            LapCount = -1; SessionLaps = 0; SessionTimeLeftMs = -1; SessionIsRace = false; FuelCap = 0; RaceLengthSec = RaceLengthLaps = 0;
+            TcMax = TcCutMax = AbsMax = EscLevel = EscMax = EngineMap = EngineMapMax = -1;
+            BrakeBias = DiffPower = DiffCoast = BatteryPct = EnergyPct = -1; Drs = -1;
+            for (int i = 0; i < 4; i++) TyrePsi[i] = TyreTemp[i] = TyreColdPsi[i] = -1;
+        }
     }
 
     // One per game. Read() returns false while the game is not running / its shared memory is missing.
@@ -168,8 +195,35 @@ namespace SimracingBR
             catch { return ""; }
         }
 
+
+        // tyre pressure (psi) and core temperature of the four tyres from the physics page (AC layout: wheelsPressure @88, tyreCoreTemperature @152)
+        protected static void FillTyres(Tele t, byte[] physics)
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                float p = BitConverter.ToSingle(physics, AcPhys.PRESSURE + 4 * i), c = BitConverter.ToSingle(physics, AcPhys.CORETEMP + 4 * i);
+                t.TyrePsi[i] = p > 8 && p < 80 ? p : -1;
+                t.TyreTemp[i] = c > -20 && c < 400 ? c : -1;
+            }
+        }
         // a game lap time in ms, or 0 while it isn't a real lap time yet
         protected static int LapOrZero(long ms) { return ms > 0 && ms < 3600000 ? (int)ms : 0; }
+
+        // "57:16", "1:02:30" or "12:34.567" -> milliseconds, -1 when it isn't a clock
+        protected static int ParseClockMs(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return -1;
+            string[] p = s.Trim().Split(':');
+            if (p.Length < 2 || p.Length > 3) return -1;
+            double total = 0;
+            for (int i = 0; i < p.Length; i++)
+            {
+                double v;
+                if (!double.TryParse(p[i], NumberStyles.Float, CultureInfo.InvariantCulture, out v) || v < 0) return -1;
+                total = total * 60 + v;
+            }
+            return total > 100 * 3600 ? -1 : (int)(total * 1000);
+        }
 
         protected static float Clamp01(float v) { return float.IsNaN(v) ? 0 : (v < 0 ? 0 : (v > 1 ? 1 : v)); }
     }

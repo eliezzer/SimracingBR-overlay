@@ -70,7 +70,8 @@ namespace SimracingBR
     public static class AcPhys
     {
         public const int PACKET = 0, GAS = 4, BRAKE = 8, FUEL = 12, GEAR = 16, RPM = 20, STEER = 24, SPEED = 28,
-                         TC = 204, ABS = 252, AUTOSHIFT = 264, CLUTCH = 364, MAXRPM = 588, TCACT = 672, ABSACT = 676;
+                         TC = 204, ABS = 252, AUTOSHIFT = 264, CLUTCH = 364, MAXRPM = 588, TCACT = 672, ABSACT = 676,
+                         PRESSURE = 88, CORETEMP = 152;   // wheelsPressure[4] (psi), tyreCoreTemperature[4] (C)
         public const int LEN = 800;
     }
 
@@ -82,9 +83,12 @@ namespace SimracingBR
             G_FUELLAP = G("fuelLiterPerLap"), G_LAPMS = G("currentLapTimeMs"), G_LAPSPOSS = G("lapsPossibleWithFuel"),
             G_RPM = G("rpm"), G_ELEC = G("electronics"), G_SHIFTUP = G("isChangeUp"),
             G_CLUTCHPCT = G("clutchPercent"), G_STATUS = G("status"), G_PITBOX = G("isInPitBox"), G_PITLANE = G("isInPitLane"), G_LOCATION = G("carLocation"),
-            G_DRIVERS = G("totalDrivers"), G_NPOS = G("npos"), G_LASTLAP = G("lastLaptimeMs"), G_BESTLAP = G("bestLaptimeMs"), G_VALID = G("isValidLap"), G_CAR = G("carModel");
+            G_DRIVERS = G("totalDrivers"), G_LAPCOUNT = G("totalLapCount"), G_FUELPCT = G("fuelLiterCurrentQuantityPercent"), G_SESSION = G("sessionState"),
+            G_ELECMAX = G("electronicsMax"), G_DIFFP = G("diffPowerRaw"), G_DIFFC = G("diffCoastRaw"), G_KERS = G("kersCurrentPerc"), G_HASKERS = G("hasKers"), G_DRSAVAIL = G("isDrsAvailable"), G_NPOS = G("npos"), G_LASTLAP = G("lastLaptimeMs"), G_BESTLAP = G("bestLaptimeMs"), G_VALID = G("isValidLap"), G_CAR = G("carModel");
         static readonly int GFX_LEN = G("isValidLap") + 1;
 
+        readonly EvoLog log = new EvoLog(null);       // session lengths of a solo event (see EvoLog.cs)
+        readonly EvoSeason season = new EvoSeason(null);   // lengths of the sessions of the event / server being played (see EvoSeason.cs)
         DateTime lastChange = DateTime.MinValue;
         int lastPacket = -1;
 
@@ -124,6 +128,7 @@ namespace SimracingBR
             t.HasTcCut = true;
             t.Status = BitConverter.ToInt32(gb, G_STATUS);
             t.InPitBox = gb[G_PITBOX] != 0;
+            t.InSetup = t.Rpm == 0 && t.SpeedKmh < 1 && (t.Status == 2 || t.Status == 3);   // seen with --probe: the setup screen has the engine off, the garage menu has it idling; also covers the starting grid
             float np = BitConverter.ToSingle(gb, G_NPOS);
             t.TrackPos = np >= 0 && np <= 1 ? np : -1;
             t.Sector = -1;                                   // not published
@@ -134,6 +139,31 @@ namespace SimracingBR
             t.HasLeader = false; Array.Clear(t.SessionBestSecMs, 0, 3);
             t.Drivers = (int)BitConverter.ToUInt32(gb, G_DRIVERS);
             t.TrackId = Str(Pages[2], S_TRACK, 32, false) + "/" + Str(Pages[2], S_LAYOUT, 32, false) + "|" + Str(gb, G_CAR, 33, false);
+            // session / fuel / electronics for the fuel and electronics overlays
+            t.ClearExtras();
+            FillTyres(t, pb);
+            t.LapCount = BitConverter.ToInt32(gb, G_LAPCOUNT);
+            float fpct = BitConverter.ToSingle(gb, G_FUELPCT);
+            t.FuelCap = (fpct > 0.01f && fpct <= 1.001f && t.Fuel > 0) ? t.Fuel / fpct : 0;
+            t.SessionIsRace = Str(Pages[2], 36, 24, false) == "Race";
+            t.SessionTimeLeftMs = ParseClockMs(Str(gb, G_SESSION + 33, 20, false));
+            t.SessionLaps = 0;                                       // not published
+            // the event definition (online servers too) first, the log of a solo event otherwise: known in practice and qualifying
+            season.Poll(); log.Poll();
+            bool fromSeason = season.RaceSeconds > 0 || season.RaceLaps > 0;
+            t.RaceLengthSec = fromSeason ? season.RaceSeconds : log.RaceSeconds; t.RaceLengthLaps = fromSeason ? season.RaceLaps : log.RaceLaps;
+            t.TcMax = (sbyte)gb[G_ELECMAX]; t.TcCutMax = (sbyte)gb[G_ELECMAX + 1]; t.AbsMax = (sbyte)gb[G_ELECMAX + 2];
+            t.EscLevel = (sbyte)gb[G_ELEC + 3]; t.EscMax = (sbyte)gb[G_ELECMAX + 3];
+            t.EngineMap = -1; t.EngineMapMax = -1;
+            float bb = BitConverter.ToSingle(gb, G_ELEC + 8);
+            t.BrakeBias = bb > 0.2f && bb < 0.95f ? bb : -1;
+            float dp = BitConverter.ToSingle(gb, G_DIFFP), dc = BitConverter.ToSingle(gb, G_DIFFC);
+            bool diff = (dp > 0 || dc > 0) && dp <= 1.001f && dc <= 1.001f;
+            t.DiffPower = diff ? dp : -1; t.DiffCoast = diff ? dc : -1;
+            float kers = BitConverter.ToSingle(gb, G_KERS);
+            t.BatteryPct = gb[G_HASKERS] != 0 ? (kers <= 1.001f ? kers * 100 : kers) : -1;
+            t.EnergyPct = -1;
+            t.Drs = gb[G_DRSAVAIL] != 0 ? 1 : -1;
             if (float.IsNaN(t.Fuel) || t.Fuel < 0 || t.Fuel > 1000) t.Fuel = 0;
             if (float.IsNaN(t.FuelPerLap) || t.FuelPerLap < 0 || t.FuelPerLap > 100) t.FuelPerLap = 0;
             return true;
