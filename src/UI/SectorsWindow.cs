@@ -8,7 +8,7 @@ namespace SimracingBR
     {
         public const string SubsKey = "SectorsSubs";
         public static readonly string[] FlagKeys = { "SectorsShowTimes", "SectorsShowLeader", "SectorsShowSectorTimes" };
-        public const int DefaultSubs = 6;
+        public const int DefaultSubs = 8;
 
         public readonly SectorsView View;
         readonly SectorTracker live, demoTracker;      // the demo (settings preview) never touches the real records

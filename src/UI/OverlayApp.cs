@@ -151,82 +151,115 @@ namespace SimracingBR
             var w = new Window
             {
                 Title = L.T("SimracingBR - Settings", "SimracingBR - Configurações"),
-                Width = 420, SizeToContent = SizeToContent.Height, ResizeMode = ResizeMode.NoResize,
-                MaxHeight = Math.Max(400, SystemParameters.WorkArea.Height - 40),
+                Width = 700, Height = Math.Min(640, SystemParameters.WorkArea.Height - 40), ResizeMode = ResizeMode.NoResize,
                 WindowStartupLocation = WindowStartupLocation.CenterScreen, Topmost = true,
                 Background = new SolidColorBrush(Color.FromRgb(22, 22, 28)), Foreground = Brushes.White,
                 FontFamily = new FontFamily("Segoe UI"), FontSize = 13
             };
-            var root = new StackPanel { Margin = new Thickness(22, 16, 22, 18) };
-            var scroll = new ScrollViewer { Content = root, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-            w.Content = scroll;
+            var shell = new Grid();
+            shell.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(210) });
+            shell.ColumnDefinitions.Add(new ColumnDefinition());
+            w.Content = shell;
 
-            root.Children.Add(new TextBlock
+            // left: one row per overlay (name + on/off switch)
+            var side = new StackPanel();
+            side.Children.Add(new TextBlock { Text = "OVERLAYS", FontWeight = FontWeights.Bold, FontSize = 11, Foreground = Muted, Margin = new Thickness(18, 18, 0, 10) });
+            var sideBox = new Border { Background = new SolidColorBrush(Color.FromRgb(15, 15, 20)), Child = side };
+            Grid.SetColumn(sideBox, 0);
+            shell.Children.Add(sideBox);
+
+            // right: header, the selected overlay's settings (scrolls), buttons
+            var right = new Grid { Margin = new Thickness(24, 16, 24, 16) };
+            right.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            right.RowDefinitions.Add(new RowDefinition());
+            right.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            Grid.SetColumn(right, 1);
+            shell.Children.Add(right);
+
+            var header = new StackPanel();
+            var title = new TextBlock { FontSize = 20, FontWeight = FontWeights.Bold };
+            header.Children.Add(title);
+            header.Children.Add(new TextBlock
             {
                 Text = L.T("Changes apply instantly. The overlays show demo data while this window is open.",
                            "As mudanças valem na hora. Os overlays mostram dados de demonstração enquanto esta janela estiver aberta."),
-                Foreground = Muted, TextWrapping = TextWrapping.Wrap, FontSize = 12
+                Foreground = Muted, TextWrapping = TextWrapping.Wrap, FontSize = 12, Margin = new Thickness(0, 4, 0, 0)
             });
+            right.Children.Add(header);
 
-            // which overlays are on
-            AddSection(root, L.T("OVERLAYS", "OVERLAYS"));
-            foreach (OverlayWindow ov in overlays)
+            var pageHost = new StackPanel();
+            var scroll = new ScrollViewer { Content = pageHost, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Margin = new Thickness(0, 4, -8, 0), Padding = new Thickness(0, 0, 8, 0) };
+            Grid.SetRow(scroll, 1);
+            right.Children.Add(scroll);
+
+            var pages = new StackPanel[overlays.Length];
+            var rows = new Border[overlays.Length];
+            int selected = 0;
+            Action<int> select = delegate (int idx)
             {
-                OverlayWindow o = ov;
-                AddCheck(root, L.T("Show the ", "Mostrar o overlay de ") + o.Title2.ToLowerInvariant() + L.T(" overlay", ""), "", () => o.Enabled,
-                    v => { o.SetEnabled(v); miOn[o].Checked = v; }, null);
-            }
-
-            // one settings page per overlay, picked with the tabs below
-            var pages = new StackPanel[2];
-            var tabs = new Border[2];
-            string[] names = { pedals.Title2.ToUpperInvariant(), sectors.Title2.ToUpperInvariant() };
-            var tabRow = new Grid { Margin = new Thickness(0, 18, 0, 0) };
-            tabRow.ColumnDefinitions.Add(new ColumnDefinition());
-            tabRow.ColumnDefinitions.Add(new ColumnDefinition());
-            for (int i = 0; i < 2; i++)
+                selected = idx;
+                for (int i = 0; i < pages.Length; i++)
+                {
+                    pages[i].Visibility = i == idx ? Visibility.Visible : Visibility.Collapsed;
+                    rows[i].Background = i == idx ? new SolidColorBrush(Color.FromRgb(34, 34, 42)) : Brushes.Transparent;
+                    rows[i].BorderBrush = i == idx ? Accent : Brushes.Transparent;
+                }
+                title.Text = overlays[idx].Title2;
+                scroll.ScrollToTop();
+            };
+            for (int i = 0; i < overlays.Length; i++)
             {
                 int idx = i;
-                var tb = new TextBlock { Text = names[i], FontWeight = FontWeights.Bold, FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center };
-                tabs[i] = new Border { Child = tb, Padding = new Thickness(0, 7, 0, 7), Cursor = Cursors.Hand, Background = Brushes.Transparent, BorderThickness = new Thickness(0, 0, 0, 2) };
-                tabs[i].MouseLeftButtonUp += delegate { SelectTab(pages, tabs, idx); };
-                Grid.SetColumn(tabs[i], i);
-                tabRow.Children.Add(tabs[i]);
+                OverlayWindow o = overlays[i];
+                var line = new DockPanel { LastChildFill = false };
+                var sw = Switch(() => o.Enabled, v => { o.SetEnabled(v); miOn[o].Checked = v; });
+                DockPanel.SetDock(sw, Dock.Right);
+                line.Children.Add(sw);
+                line.Children.Add(new TextBlock { Text = o.Title2, FontSize = 14, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
+                rows[i] = new Border { Child = line, Padding = new Thickness(15, 12, 14, 12), BorderThickness = new Thickness(3, 0, 0, 0), Cursor = Cursors.Hand, Background = Brushes.Transparent };
+                rows[i].MouseLeftButtonUp += delegate { select(idx); };
+                side.Children.Add(rows[i]);
                 pages[i] = new StackPanel();
+                pageHost.Children.Add(pages[i]);
             }
-            root.Children.Add(tabRow);
             BuildPedalsPage(pages[0]);
             BuildSectorsPage(pages[1]);
-            root.Children.Add(pages[0]); root.Children.Add(pages[1]);
-            int tab = 0;
-            SelectTab(pages, tabs, tab);
-            for (int i = 0; i < 2; i++) { int idx = i; tabs[i].MouseLeftButtonUp += delegate { tab = idx; }; }
 
-            var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 18, 0, 0) };
+            var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0) };
             var reset = new Button { Content = L.T("Reset this overlay", "Restaurar este overlay"), Padding = new Thickness(12, 5, 12, 5), Margin = new Thickness(0, 0, 8, 0) };
             reset.Click += delegate
             {
-                if (tab == 0) pedals.ResetDefaults(); else sectors.ResetDefaults();
+                if (selected == 0) pedals.ResetDefaults(); else sectors.ResetDefaults();
                 foreach (Action r in refreshers) r();
             };
             var close = new Button { Content = L.T("Close", "Fechar"), Padding = new Thickness(18, 5, 18, 5), IsDefault = true };
             close.Click += delegate { w.Close(); };
             buttons.Children.Add(reset); buttons.Children.Add(close);
-            root.Children.Add(buttons);
+            Grid.SetRow(buttons, 2);
+            right.Children.Add(buttons);
 
+            select(0);          // the pedals overlay (first in the list) is open by default
             w.Closed += delegate { settingsWin = null; settingsOpen = false; SaveAll(); try { cfg.Save(); } catch { } };
             settingsWin = w; settingsOpen = true;
             w.Show(); w.Activate();
         }
 
-        static void SelectTab(StackPanel[] pages, Border[] tabs, int sel)
+        // on / off switch
+        UIElement Switch(Func<bool> get, Action<bool> set)
         {
-            for (int i = 0; i < pages.Length; i++)
+            var knob = new Border { Width = 16, Height = 16, CornerRadius = new CornerRadius(8), Background = Brushes.White, VerticalAlignment = VerticalAlignment.Center };
+            var track = new Border { Width = 40, Height = 22, CornerRadius = new CornerRadius(11), Child = knob, Cursor = Cursors.Hand };
+            Action paint = delegate
             {
-                pages[i].Visibility = i == sel ? Visibility.Visible : Visibility.Collapsed;
-                tabs[i].BorderBrush = i == sel ? Accent : new SolidColorBrush(Color.FromRgb(50, 50, 58));
-                ((TextBlock)tabs[i].Child).Foreground = i == sel ? Brushes.White : Muted;
-            }
+                bool on = get();
+                track.Background = new SolidColorBrush(on ? Color.FromRgb(51, 214, 138) : Color.FromRgb(70, 70, 80));
+                knob.HorizontalAlignment = on ? HorizontalAlignment.Right : HorizontalAlignment.Left;
+                knob.Margin = on ? new Thickness(0, 0, 3, 0) : new Thickness(3, 0, 0, 0);
+            };
+            track.MouseLeftButtonUp += delegate (object s, MouseButtonEventArgs e) { set(!get()); paint(); e.Handled = true; };
+            refreshers.Add(paint);
+            paint();
+            return track;
         }
 
         void BuildPedalsPage(Panel root)
@@ -362,7 +395,7 @@ namespace SimracingBR
             foreach (OverlayWindow ov in overlays)
             {
                 OverlayWindow o = ov;
-                var on = new WF.ToolStripMenuItem(o.Title2, null, delegate { o.SetEnabled(!o.Enabled); miOn[o].Checked = o.Enabled; });
+                var on = new WF.ToolStripMenuItem(o.Title2, null, delegate { o.SetEnabled(!o.Enabled); miOn[o].Checked = o.Enabled; if (settingsWin != null) foreach (Action r in refreshers) r(); });
                 on.Checked = o.Enabled;
                 miOn[o] = on; overlaysMenu.DropDownItems.Add(on);
 
