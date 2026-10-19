@@ -32,6 +32,7 @@ namespace SimracingBR
         public int RaceMinutes;                    // total time of a timed race, 0 = lap race / unknown
         public double RaceFuel = -1;               // litres for the whole race, -1 = unknown
         public bool TimedRace;                     // the race laps came from the clock
+        public int RaceSource;                     // where the race length comes from: 0 unknown, 1 your setting, 2 the game, 3 the last race seen
 
         // lap in progress
         int prevLapMs, prevLapCount = -1;
@@ -42,8 +43,13 @@ namespace SimracingBR
         double storedPerLap;
         int raceStartClockMs;                      // highest session clock seen in a race session
         string trackId = "";
+        int learnedLaps, learnedMinutes; bool learnedIsLaps;     // the last race seen, kept between runs
 
-        public FuelModel(Settings cfg) { this.cfg = cfg; }
+        public FuelModel(Settings cfg)
+        {
+            this.cfg = cfg;
+            if (cfg != null) { learnedLaps = (int)cfg.Num("FuelLastRaceLaps", 0); learnedMinutes = (int)cfg.Num("FuelLastRaceMinutes", 0); learnedIsLaps = cfg.Bool("FuelLastRaceIsLaps", false); }
+        }
 
         public void Update(Tele t)
         {
@@ -97,19 +103,37 @@ namespace SimracingBR
 
         void Race(Tele t)
         {
-            RaceLaps = -1; RaceFuel = -1; RaceMinutes = 0; TimedRace = false;
+            RaceLaps = -1; RaceFuel = -1; RaceMinutes = 0; TimedRace = false; RaceSource = 0;
             int lap = BestValidLapMs > 0 ? BestValidLapMs : (t.BestLapMs > 0 ? t.BestLapMs : 0);
+            int laps = 0, minutes = 0;
 
-            if (ManualRaceLaps > 0) RaceLaps = ManualRaceLaps;
-            else if (ManualRaceMinutes > 0 && lap > 0) { RaceLaps = ManualRaceMinutes * 60000.0 / lap + 0.5; TimedRace = true; RaceMinutes = ManualRaceMinutes; }
-            else if (ManualRaceMinutes > 0) { TimedRace = true; RaceMinutes = ManualRaceMinutes; }
-            else if (t.SessionIsRace && t.SessionLaps > 0) RaceLaps = t.SessionLaps;
-            else if (t.SessionIsRace && raceStartClockMs > 0)
+            // the race length: your setting, else what the game says (only in the race session), else the last race seen
+            if (ManualRaceLaps > 0) { laps = ManualRaceLaps; RaceSource = 1; }
+            else if (ManualRaceMinutes > 0) { minutes = ManualRaceMinutes; RaceSource = 1; }
+            else if (t.SessionIsRace && t.SessionLaps > 0) { laps = t.SessionLaps; RaceSource = 2; Learn(laps, 0); }
+            else if (t.SessionIsRace && raceStartClockMs > 0) { minutes = (int)Math.Round(raceStartClockMs / 60000.0); RaceSource = 2; Learn(0, minutes); }
+            else if (learnedIsLaps && learnedLaps > 0) { laps = learnedLaps; RaceSource = 3; }
+            else if (learnedMinutes > 0) { minutes = learnedMinutes; RaceSource = 3; }
+
+            if (laps > 0) RaceLaps = laps;
+            else if (minutes > 0)
             {
-                TimedRace = true; RaceMinutes = (int)Math.Round(raceStartClockMs / 60000.0);
-                if (lap > 0) RaceLaps = raceStartClockMs / (double)lap + 0.5;
+                TimedRace = true; RaceMinutes = minutes;
+                if (lap > 0) RaceLaps = minutes * 60000.0 / lap + 0.5;
             }
             if (RaceLaps >= 0 && PerLap > 0.01) RaceFuel = (RaceLaps + MarginLaps) * PerLap;
+        }
+
+        // the race just seen becomes the one assumed next time, so the total is ready in the next qualifying
+        void Learn(int laps, int minutes)
+        {
+            bool isLaps = laps > 0;
+            if (cfg == null || (isLaps == learnedIsLaps && laps == learnedLaps && minutes == learnedMinutes)) return;
+            learnedIsLaps = isLaps; learnedLaps = laps; learnedMinutes = minutes;
+            cfg.Set("FuelLastRaceLaps", laps.ToString(CultureInfo.InvariantCulture));
+            cfg.Set("FuelLastRaceMinutes", minutes.ToString(CultureInfo.InvariantCulture));
+            cfg.Set("FuelLastRaceIsLaps", isLaps ? "1" : "0");
+            try { cfg.Save(); } catch { }
         }
 
         // ---- remembered between runs (per track + car) -----------------------------------------

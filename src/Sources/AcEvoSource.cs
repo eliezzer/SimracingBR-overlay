@@ -126,7 +126,7 @@ namespace SimracingBR
             t.HasTcCut = true;
             t.Status = BitConverter.ToInt32(gb, G_STATUS);
             t.InPitBox = gb[G_PITBOX] != 0;
-            t.InSetup = t.InPitBox && t.Rpm == 0 && t.SpeedKmh < 1 && t.Status == 2;   // seen with --probe: the setup screen has the engine off, the garage menu has it idling
+            t.InSetup = t.Rpm == 0 && t.SpeedKmh < 1 && (t.Status == 2 || t.Status == 3);   // seen with --probe: the setup screen has the engine off, the garage menu has it idling; also covers the starting grid
             float np = BitConverter.ToSingle(gb, G_NPOS);
             t.TrackPos = np >= 0 && np <= 1 ? np : -1;
             t.Sector = -1;                                   // not published
