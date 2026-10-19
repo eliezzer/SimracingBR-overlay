@@ -141,11 +141,11 @@ namespace SimracingBR
                 if (wrap)
                 {
                     double frac = (1 - prevPos) / ((1 - prevPos) + pos), tw = prevMs + frac * (ms - prevMs);
-                    if (clean && nextIdx <= Count)
+                    if (nextIdx <= Count)
                     {
                         cross[Count] = tw - lapStart;
-                        EvalSeg(Count - 1);
-                        FinishLap(tw - lapStart);
+                        if (segOk) EvalSeg(Count - 1);
+                        if (clean) FinishLap(tw - lapStart);
                     }
                     BeginLap(!t.InPitLane, pos, t, tw);
                     if (!clean) Why = "pit lane";
@@ -153,7 +153,7 @@ namespace SimracingBR
                 else if (pos < prevPos - 0.02 || pos > prevPos + 0.2)
                 {
                     Unclean("position jump");         // teleport, rewind, restart: this lap won't count
-                    nextIdx = IndexAfter(pos);
+                    nextIdx = IndexAfter(pos); cross[nextIdx - 1] = Nan;
                 }
                 else
                 {
@@ -162,8 +162,12 @@ namespace SimracingBR
                     {
                         double f = pos > prevPos ? (bound[nextIdx] - prevPos) / (pos - prevPos) : 1;
                         f = Math.Max(0, Math.Min(1, f));
-                        cross[nextIdx] = clean ? prevMs + f * (ms - prevMs) - lapStart : Nan;
-                        if (clean) { EvalSeg(nextIdx - 1); if (!double.IsNaN(refCross[nextIdx])) Ahead = cross[nextIdx] < refCross[nextIdx]; }
+                        cross[nextIdx] = prevMs + f * (ms - prevMs) - lapStart;
+                        if (!segOk) secBad = true;
+                        if (segOk) EvalSeg(nextIdx - 1);
+                        if (nextIdx % Subs == 0) secBad = false;
+                        if (clean && !double.IsNaN(refCross[nextIdx])) Ahead = cross[nextIdx] < refCross[nextIdx];
+                        segOk = !t.InPitLane;
                         nextIdx++;
                     }
                 }
@@ -176,7 +180,9 @@ namespace SimracingBR
             Progress = b > a ? (float)Math.Max(0, Math.Min(1, (pos - a) / (b - a))) : 0;
         }
 
-        void Unclean(string why) { if (clean) Why = why; clean = false; }
+        // clean = the whole lap can become the reference; segOk = the segment in progress can still be scored
+        bool segOk = true, secBad;     // secBad: part of the main sector in progress was not driven normally
+        void Unclean(string why) { if (clean) Why = why; clean = false; segOk = false; }
 
         void BeginLap(bool fromLine, float pos, Tele t, double start)
         {
@@ -184,7 +190,7 @@ namespace SimracingBR
             cross[0] = fromLine ? 0 : Nan;
             lapStart = start;
             nextIdx = fromLine ? 1 : IndexAfter(pos);
-            clean = fromLine; sawWrap = fromLine; lapValid = t.LapValid; transCount = 0; Ahead = false;
+            clean = fromLine; sawWrap = fromLine; lapValid = t.LapValid; transCount = 0; Ahead = false; segOk = !t.InPitLane; secBad = false;
             if (fromLine) Why = "";
             prevSector = t.Sector;
         }
@@ -248,9 +254,9 @@ namespace SimracingBR
         // ---- scoring ------------------------------------------------------------------------
         SegState Classify(double t, double best, double reference)
         {
-            if (double.IsNaN(best)) return SegState.None;
-            if (t <= best) return lapValid ? SegState.Purple : SegState.Green;
-            if (!double.IsNaN(reference) && t <= reference) return SegState.Green;
+            if (double.IsNaN(best)) return lapValid ? SegState.Purple : SegState.None;   // the first time through is a record
+            if (t <= best + 2) return lapValid ? SegState.Purple : SegState.Green;   // within 2 ms counts as equal
+            if (!double.IsNaN(reference) && t <= reference + 2) return SegState.Green;
             return SegState.Yellow;
         }
 
@@ -261,12 +267,14 @@ namespace SimracingBR
             if (double.IsNaN(a) || double.IsNaN(b) || b <= a) return;
             int now = Environment.TickCount;
             SegMs[i] = b - a; Seg[i] = Classify(b - a, bestSeg[i], refSeg[i]); SegStamp[i] = now;
+            if (lapValid && (double.IsNaN(bestSeg[i]) || b - a < bestSeg[i])) bestSeg[i] = b - a;   // records are kept as soon as the stretch is driven
             if ((i + 1) % Subs == 0)
             {
                 int m = i / Subs;
                 double s0 = cross[m * Subs];
-                if (double.IsNaN(s0) || b <= s0) return;
+                if (secBad || double.IsNaN(s0) || b <= s0) return;
                 SecMs[m] = b - s0; Sec[m] = Classify(b - s0, bestSec[m], refSec[m]); SecStamp[m] = now;
+                if (lapValid && (double.IsNaN(bestSec[m]) || b - s0 < bestSec[m])) bestSec[m] = b - s0;
             }
         }
 
