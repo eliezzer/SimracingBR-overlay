@@ -122,3 +122,5 @@ The fuel and tyre overlays have a **When to show** choice in Settings: on track,
 The **Sectors** and **Fuel** overlays are marked **BETA** in the settings menu and the tray menu: they work, but are still being tuned.
 
 In a **solo Race Weekend** of AC EVO the race length is read from the game's own log (`Saved Games\ACE\Logs\log-*.txt`, the "Game Started!" line; the file is only read) so the fuel overlay knows it already in practice and qualifying. Online servers don't write that line: there the overlay uses your setting, or the last race it saw.
+
+For **online servers** the race length is read from `Saved Games\ACE\last_season.seasondefinition`, the event definition the game rewrites when you join a server (read only). It is a Protocol Buffers file; for AC EVO 0.9.1 the settings of each session are at `25 -> 2 -> 200`: field 3 is the duration in ms of a timed session, field 5 the number of laps of a lap race (seen: 10 minute qualifying = 600000, 10 lap race = 10). Timed races have not been seen yet, so that case is a guess.

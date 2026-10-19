@@ -88,6 +88,7 @@ namespace SimracingBR
         static readonly int GFX_LEN = G("isValidLap") + 1;
 
         readonly EvoLog log = new EvoLog(null);       // session lengths of a solo event (see EvoLog.cs)
+        readonly EvoSeason season = new EvoSeason(null);   // lengths of the sessions of the event / server being played (see EvoSeason.cs)
         DateTime lastChange = DateTime.MinValue;
         int lastPacket = -1;
 
@@ -147,7 +148,10 @@ namespace SimracingBR
             t.SessionIsRace = Str(Pages[2], 36, 24, false) == "Race";
             t.SessionTimeLeftMs = ParseClockMs(Str(gb, G_SESSION + 33, 20, false));
             t.SessionLaps = 0;                                       // not published
-            log.Poll(); t.RaceLengthSec = log.RaceSeconds; t.RaceLengthLaps = log.RaceLaps;   // solo events only: known in practice and qualifying too
+            // the event definition (online servers too) first, the log of a solo event otherwise: known in practice and qualifying
+            season.Poll(); log.Poll();
+            bool fromSeason = season.RaceSeconds > 0 || season.RaceLaps > 0;
+            t.RaceLengthSec = fromSeason ? season.RaceSeconds : log.RaceSeconds; t.RaceLengthLaps = fromSeason ? season.RaceLaps : log.RaceLaps;
             t.TcMax = (sbyte)gb[G_ELECMAX]; t.TcCutMax = (sbyte)gb[G_ELECMAX + 1]; t.AbsMax = (sbyte)gb[G_ELECMAX + 2];
             t.EscLevel = (sbyte)gb[G_ELEC + 3]; t.EscMax = (sbyte)gb[G_ELECMAX + 3];
             t.EngineMap = -1; t.EngineMapMax = -1;
