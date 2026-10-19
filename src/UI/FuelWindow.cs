@@ -16,7 +16,7 @@ namespace SimracingBR
 
         public static FuelWindow Create(Settings s, Tele t)
         {
-            var view = new FuelView();
+            var view = new FuelView { M = new FuelModel(s) };
             view.T = t;
             var w = new FuelWindow(s, view);
             w.LoadFlags();
@@ -31,11 +31,19 @@ namespace SimracingBR
             View.ShowSuggested = cfg.Bool("FuelShowSuggested", true);
             View.M.MarginLaps = cfg.Num("FuelMargin", DefaultMargin);
             View.M.ManualRaceLaps = (int)Math.Max(0, cfg.Num("FuelRaceLaps", 0));
+            View.M.ManualRaceMinutes = (int)Math.Max(0, cfg.Num("FuelRaceMinutes", 0));
             View.Relayout();
         }
 
         public double Margin { get { return View.M.MarginLaps; } }
         public int RaceLaps { get { return View.M.ManualRaceLaps; } }
+        public int RaceMinutes { get { return View.M.ManualRaceMinutes; } }
+
+        public void SetRaceMinutes(int n)
+        {
+            View.M.ManualRaceMinutes = Math.Max(0, Math.Min(600, n));
+            cfg.Set("FuelRaceMinutes", View.M.ManualRaceMinutes.ToString(CultureInfo.InvariantCulture)); QueueSave();
+        }
 
         public void SetMargin(double v)
         {
@@ -54,7 +62,7 @@ namespace SimracingBR
         public void ResetDefaults()
         {
             foreach (string k in FlagKeys) cfg.Set(k, "1");
-            cfg.Set("FuelMargin", DefaultMargin.ToString(CultureInfo.InvariantCulture)); cfg.Set("FuelRaceLaps", "0");
+            cfg.Set("FuelMargin", DefaultMargin.ToString(CultureInfo.InvariantCulture)); cfg.Set("FuelRaceLaps", "0"); cfg.Set("FuelRaceMinutes", "0");
             Reflow(LoadFlags);
             ApplyScale(1.0, true);
             SetOpacity(0.94);

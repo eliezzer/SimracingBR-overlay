@@ -1,4 +1,4 @@
-// Fuel overlay drawing: fuel in the tank (with a bar), consumption per lap, laps left and the suggested refuel.
+// Fuel overlay drawing: fuel in the tank (with a bar), consumption per lap, laps left and the fuel for the whole race.
 using System;
 using System.Globalization;
 using System.Windows;
@@ -12,7 +12,7 @@ namespace SimracingBR
         const double FL = 12, FV = 20, FU = 12;           // label / value / unit font sizes (same as the pedals overlay)
 
         public Tele T = new Tele();
-        public FuelModel M = new FuelModel();
+        public FuelModel M = new FuelModel(null);
         public bool Unlocked { get; set; }
         public bool Hover { get; set; }
         public bool ShowFuel = true, ShowPerLap = true, ShowLapsLeft = true, ShowSuggested = true;
@@ -90,24 +90,24 @@ namespace SimracingBR
             if (k > 0.004) dc.DrawRoundedRectangle(b, null, new Rect(x, y, w * k, BAR_H), 2, 2);
         }
 
-        // how much to add to finish the race, with the numbers behind it
+        // the fuel for the whole race, with the numbers behind it (never the time left or what is in the tank)
         void DrawSuggested(DrawingContext dc, double x, double y, double w)
         {
             dc.DrawRoundedRectangle(Chrome.Br(10, 255, 255, 255), null, new Rect(x, y, w, SUG_H), 3, 3);
-            Chrome.Text(this, dc, L.T("REFUEL", "ABASTECER"), FL, gray, true, x + 10, y + 11, 0);
-            string val; Brush b = white;
-            if (M.ToAdd < 0) val = "--";
-            else if (M.ToAdd <= 0.05) { val = L.T("ENOUGH", "SUFICIENTE"); b = green; }
-            else { val = "+" + M.ToAdd.ToString("0.0", CultureInfo.InvariantCulture) + " L"; b = amber; }
-            Chrome.Text(this, dc, val, 24, b, true, x + w - 10, y + 5, 2);
+            Chrome.Text(this, dc, L.T("RACE FUEL", "COMBUSTÍVEL DA CORRIDA"), FL, gray, true, x + 10, y + 11, 0);
+            string val = M.RaceFuel < 0 ? "--" : M.RaceFuel.ToString("0.0", CultureInfo.InvariantCulture) + " L";
+            Chrome.Text(this, dc, val, 24, M.RaceFuel < 0 ? white : amber, true, x + w - 10, y + 5, 2);
             string sub;
-            if (M.LapsToGo >= 0 && M.Needed >= 0)
-                sub = M.LapsToGo.ToString("0.0", CultureInfo.InvariantCulture) + L.T(" laps to go", " voltas até o fim") + "  ·  " +
-                      L.T("need ", "precisa ") + M.Needed.ToString("0.0", CultureInfo.InvariantCulture) + " L"
-                      + (M.TimedRace ? "  ·  " + L.T("timed", "por tempo") : "");
-            else if (M.PerLap <= 0) sub = L.T("measuring consumption...", "medindo o consumo...");
-            else if (T.SessionIsRace && T.SessionLaps <= 0 && M.BestValidLapMs <= 0 && T.BestLapMs <= 0) sub = L.T("needs a valid lap for the lap time", "precisa de uma volta válida para o tempo de volta");
-            else sub = L.T("not a race (or set the race laps in Settings)", "não é corrida (ou defina as voltas nas Configurações)");
+            if (M.RaceFuel >= 0)
+            {
+                sub = M.RaceLaps.ToString("0.0", CultureInfo.InvariantCulture) + L.T(" laps", " voltas");
+                if (M.TimedRace && M.RaceMinutes > 0) sub += " (" + M.RaceMinutes + " min)";
+                sub += "  ·  " + M.PerLap.ToString("0.00", CultureInfo.InvariantCulture) + " L" + L.T("/lap", "/volta");
+                if (M.TimedRace) sub += "  ·  " + L.T("lap ", "volta ") + Chrome.Time(M.BestValidLapMs > 0 ? M.BestValidLapMs : T.BestLapMs);
+            }
+            else if (M.PerLap <= 0) sub = L.T("measuring consumption (one full lap)...", "medindo o consumo (uma volta completa)...");
+            else if (M.RaceLaps < 0 && !M.TimedRace) sub = L.T("set the race length in Settings (laps or minutes)", "defina a duração da corrida nas Configurações (voltas ou minutos)");
+            else sub = L.T("needs a valid lap to know the lap time", "precisa de uma volta válida para saber o tempo de volta");
             Chrome.Text(this, dc, sub, 10.5, gray, false, x + 10, y + 38, 0);
         }
     }

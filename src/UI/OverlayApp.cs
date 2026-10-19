@@ -323,19 +323,21 @@ namespace SimracingBR
             AddCheck(root, L.T("Fuel in the tank (with a level bar)", "Combustível no tanque (com barra de nível)"), "FuelShowFuel", () => v.ShowFuel, x => v.ShowFuel = x, after);
             AddCheck(root, L.T("Consumption per lap", "Consumo por volta"), "FuelShowPerLap", () => v.ShowPerLap, x => v.ShowPerLap = x, after);
             AddCheck(root, L.T("Laps left on the tank", "Voltas restantes no tanque"), "FuelShowLapsLeft", () => v.ShowLapsLeft, x => v.ShowLapsLeft = x, after);
-            AddCheck(root, L.T("Suggested refuel for the race", "Abastecimento sugerido para a corrida"), "FuelShowSuggested", () => v.ShowSuggested, x => v.ShowSuggested = x, after);
+            AddCheck(root, L.T("Fuel for the whole race (suggestion)", "Combustível para a corrida inteira (sugestão)"), "FuelShowSuggested", () => v.ShowSuggested, x => v.ShowSuggested = x, after);
 
             AddSection(root, L.T("RACE", "CORRIDA"));
             root.Children.Add(new TextBlock
             {
-                Text = L.T("The suggestion uses the consumption per lap, your fastest valid lap and the race length (laps, or the time left when the race is timed). Only in race sessions.",
-                           "A sugestão usa o consumo por volta, a sua volta válida mais rápida e a duração da corrida (voltas, ou o tempo restante quando é por tempo). Só em sessões de corrida."),
+                Text = L.T("The suggestion is the fuel for the WHOLE race: consumption per lap x the race laps (or the race time divided by your fastest valid lap, remembered from practice and qualifying) plus the margin. Set the race length below, or leave it on auto to use what the game says during the race session.",
+                           "A sugestão é o combustível para a corrida INTEIRA: consumo por volta x voltas da corrida (ou o tempo da corrida dividido pela sua volta válida mais rápida, lembrada do treino e do qualy) mais a margem. Defina a duração da corrida abaixo, ou deixe em automático para usar o que o jogo informa na sessão de corrida."),
                 Foreground = Muted, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0)
             });
             AddSlider(root, L.T("Safety margin (laps of fuel)", "Margem de segurança (voltas de combustível)"), 0, 3, 0.5, () => fuel.Margin,
                 x => fuel.SetMargin(x), x => x.ToString("0.0", CultureInfo.InvariantCulture));
-            AddSlider(root, L.T("Race laps (0 = what the game says)", "Voltas da corrida (0 = o que o jogo informa)"), 0, 200, 1, () => fuel.RaceLaps,
+            AddSlider(root, L.T("Race length in laps (auto = what the game says)", "Duração da corrida em voltas (auto = o que o jogo informa)"), 0, 200, 1, () => fuel.RaceLaps,
                 x => fuel.SetRaceLaps((int)Math.Round(x)), x => Math.Round(x) <= 0 ? L.T("auto", "auto") : Math.Round(x).ToString(CultureInfo.InvariantCulture));
+            AddSlider(root, L.T("Race length in minutes (for timed races; auto = what the game says)", "Duração da corrida em minutos (corrida por tempo; auto = o que o jogo informa)"), 0, 240, 5, () => fuel.RaceMinutes,
+                x => fuel.SetRaceMinutes((int)Math.Round(x)), x => Math.Round(x) <= 0 ? L.T("auto", "auto") : Math.Round(x).ToString(CultureInfo.InvariantCulture) + " min");
 
             AddAppearance(root, fuel);
         }
