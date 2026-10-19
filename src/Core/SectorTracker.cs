@@ -2,9 +2,9 @@
 // The games only publish the 3 main sectors (some not even that), but they all publish where the car is on the lap
 // (0..1) and the current lap time. So the lap is cut into 3 main sectors x N sub-sectors and every crossing is timed.
 //
-// Colors (references are the player's own laps in this session):
-//   purple = fastest this segment has ever been driven, green = faster than the same segment on the best lap,
-//   yellow = slower than the best lap, gray = nothing to compare with yet.
+// Colors:
+//   purple = the best time anyone did on that stretch (all drivers where the game publishes it, else your own best),
+//   green = faster than your previous time through it, yellow = slower, gray = nothing to compare with yet.
 using System;
 using System.Diagnostics;
 using System.Globalization;
@@ -34,6 +34,7 @@ namespace SimracingBR
         public int OwnBestMs, OwnLastMs;       // lap times seen by the tracker (used when the game doesn't publish them)
 
         // references
+        int[] othersSec = new int[Main];       // best main-sector times of all drivers (ms, 0 = the game doesn't say)
         bool[] provSeg, provSec;               // the best time comes from a lap that was not valid (placeholder until a valid one)
         double[] bestSeg, refSeg, bestSec, refSec, refCross;   // refCross: lap time at each boundary on the best lap
         public bool Ahead;                     // the lap in progress is ahead of the best lap so far
@@ -126,6 +127,7 @@ namespace SimracingBR
             }
 
             float pos = t.TrackPos;
+            for (int m = 0; m < Main; m++) othersSec[m] = t.SessionBestSecMs[m];
             if (!t.LapValid) lapValid = false;
             if (t.InPitLane) Unclean("pit lane");
 
@@ -253,12 +255,16 @@ namespace SimracingBR
         }
 
         // ---- scoring ------------------------------------------------------------------------
-        SegState Classify(double t, double best, double reference)
+        // purple = the best time anyone has done there (all drivers where the game tells us, otherwise your own best of the
+        // session; the first time through counts as a record), green = faster than the previous time through, yellow = slower.
+        // `others` = the best time of all drivers, 0 when the game doesn't publish it.
+        SegState Classify(double t, double ownBest, double prev, double others)
         {
-            if (double.IsNaN(best)) return SegState.Purple;   // the first time through is a record, valid lap or not
-            if (t <= best + 2) return lapValid ? SegState.Purple : SegState.Green;   // within 2 ms counts as equal
-            if (!double.IsNaN(reference) && t <= reference + 2) return SegState.Green;
-            return SegState.Yellow;
+            if (others > 0) { if (t <= others + 30) return lapValid ? SegState.Purple : SegState.Green; }
+            else if (double.IsNaN(ownBest)) return SegState.Purple;
+            else if (t <= ownBest + 2) return lapValid ? SegState.Purple : SegState.Green;   // within 2 ms counts as equal
+            if (double.IsNaN(prev)) return SegState.None;
+            return t <= prev + 2 ? SegState.Green : SegState.Yellow;
         }
 
         // a valid lap sets the record; an invalid one only leaves a placeholder where there is nothing yet
@@ -274,14 +280,14 @@ namespace SimracingBR
             double a = cross[i], b = cross[i + 1];
             if (double.IsNaN(a) || double.IsNaN(b) || b <= a) return;
             int now = Environment.TickCount;
-            SegMs[i] = b - a; Seg[i] = Classify(b - a, provSeg[i] ? Nan : bestSeg[i], refSeg[i]); SegStamp[i] = now;
+            SegMs[i] = b - a; Seg[i] = Classify(b - a, provSeg[i] ? Nan : bestSeg[i], refSeg[i], 0); SegStamp[i] = now; refSeg[i] = b - a;   // refSeg = the previous time through
             Record(ref bestSeg[i], ref provSeg[i], b - a);   // records are kept as soon as the stretch is driven
             if ((i + 1) % Subs == 0)
             {
                 int m = i / Subs;
                 double s0 = cross[m * Subs];
                 if (secBad || double.IsNaN(s0) || b <= s0) return;
-                SecMs[m] = b - s0; Sec[m] = Classify(b - s0, provSec[m] ? Nan : bestSec[m], refSec[m]); SecStamp[m] = now;
+                SecMs[m] = b - s0; Sec[m] = Classify(b - s0, provSec[m] ? Nan : bestSec[m], refSec[m], othersSec[m]); SecStamp[m] = now; refSec[m] = b - s0;
                 Record(ref bestSec[m], ref provSec[m], b - s0);
             }
         }
@@ -301,14 +307,12 @@ namespace SimracingBR
                 double s = cross[i + 1] - cross[i];
                 if (s <= 0) continue;
                 Record(ref bestSeg[i], ref provSeg[i], s);
-                if (newRef) refSeg[i] = s;
             }
             for (int m = 0; m < Main; m++)
             {
                 double s = cross[(m + 1) * Subs] - cross[m * Subs];
                 if (s <= 0) continue;
                 Record(ref bestSec[m], ref provSec[m], s);
-                if (newRef) refSec[m] = s;
             }
             if (newRef) { refTotal = total; Array.Copy(cross, refCross, cross.Length); }
         }

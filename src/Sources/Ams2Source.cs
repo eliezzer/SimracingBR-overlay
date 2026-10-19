@@ -181,12 +181,17 @@ namespace SimracingBR
             t.BestLapMs = LapOrZero((long)(F(BESTLAP) * 1000));
             t.LastLapMs = LapOrZero((long)(F(LASTLAP) * 1000));
             t.HasLeader = true; t.LeaderBestMs = 0; t.LeaderLastMs = 0;
-            t.SessionBestMs = 0;
+            t.SessionBestMs = 0; Array.Clear(t.SessionBestSecMs, 0, 3);
             for (int i = 0; i < n; i++)
             {
                 if (Pages[0][PART + i * PART_LEN + P_ACTIVE] == 0) continue;
                 int best = LapOrZero((long)(F(PTIMES + (6 * MAXP + i) * 4) * 1000));
                 if (best > 0 && (t.SessionBestMs == 0 || best < t.SessionBestMs)) t.SessionBestMs = best;
+                for (int k = 0; k < 3; k++)
+                {
+                    int sec = LapOrZero((long)(F(PTIMES + ((3 + k) * MAXP + i) * 4) * 1000));
+                    if (sec > 0 && (t.SessionBestSecMs[k] == 0 || sec < t.SessionBestSecMs[k])) t.SessionBestSecMs[k] = sec;
+                }
                 if (U(PART + i * PART_LEN + P_RACEPOS) == 1)
                 {
                     t.LeaderBestMs = best;

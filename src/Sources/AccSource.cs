@@ -125,7 +125,7 @@ namespace SimracingBR
             t.InPitLane = BitConverter.ToInt32(gb, G_PITLANE) != 0;
             t.LastLapMs = LapOrZero(BitConverter.ToInt32(gb, G_LAST));
             t.BestLapMs = LapOrZero(BitConverter.ToInt32(gb, G_BEST));
-            t.HasLeader = false;
+            t.HasLeader = false; Array.Clear(t.SessionBestSecMs, 0, 3);
             t.TrackId = Str(sb, S_TRACK, 66, true) + "|" + Str(sb, S_CAR, 66, true);
             if (float.IsNaN(t.Fuel) || t.Fuel < 0 || t.Fuel > 1000) t.Fuel = 0;
             if (float.IsNaN(t.FuelPerLap) || t.FuelPerLap < 0 || t.FuelPerLap > 100) t.FuelPerLap = 0;
