@@ -91,3 +91,11 @@ src/UI/HudWindow.cs         window, tray, hotkeys, settings, auto-hide
 ```
 
 To add a game: write an `ITelemetrySource` (usually derived from `ShmSource`) that fills in `Tele`, and add it to `GameSources`.
+
+## Sectors overlay
+
+A second overlay (switch it on/off and configure it in **Settings**, next to the pedals overlay): current / best / last lap, the leader's best lap (LMU and AMS2) and S1 / S2 / S3 split into sub-sectors.
+
+The games only publish the 3 main sectors, so the overlay times the sub-sectors itself from the lap position and the lap time (every game publishes both). Colors, compared with your own laps in the session: **purple** = your fastest ever on that stretch, **green** = faster than the same stretch of your best lap, **yellow** = slower, **gray** = nothing to compare yet. The first clean lap (no pit lane, no cut) sets the reference.
+
+Notes: the main-sector boundaries are learned from the game's sector changes (ACC, LMU, AMS2) and remembered per track in `settings.ini`; AC EVO does not publish the sector, so it uses thirds of the lap. `--probe` now also logs the lap position, sector and lap times. Keys: `SectorsSubs`, `SectorsShowTimes`, `SectorsShowLeader`, `SectorsShowSectorTimes`, `SectorsOpacity`, `SectorsScale`, `PedalsEnabled`, `SectorsEnabled`, `ColorSecPurple` / `ColorSecGreen` / `ColorSecYellow`.

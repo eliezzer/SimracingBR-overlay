@@ -26,9 +26,12 @@ namespace SimracingBR
             bool demo = Array.IndexOf(args, "--demo") >= 0;
             var cfg = new Settings(Path.Combine(dir, "settings.ini"));
             var app = new Application();
-            var win = new HudWindow(cfg, dir, demo);
-            win.Show();
-            return app.Run();
+            app.ShutdownMode = ShutdownMode.OnExplicitShutdown;   // the overlays can all be off: the tray icon keeps the app alive
+            var ui = new OverlayApp(cfg, dir, demo);
+
+            int rc = app.Run();
+            GC.KeepAlive(ui);
+            return rc;
         }
 
         // Writes probe.log for ~40 s: raw values from every supported game so offsets/units can be verified.

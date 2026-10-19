@@ -16,7 +16,7 @@ using WF = System.Windows.Forms;
 
 namespace SimracingBR
 {
-    public class HudView : FrameworkElement
+    public class HudView : FrameworkElement, IOverlayView
     {
         const int N = 420;                       // history samples (~7 s at 60 Hz)
         const double PAD = 12, ROW = 104, STRIP = 34, VGAP = 8, HGAP = 14;
@@ -26,7 +26,7 @@ namespace SimracingBR
         const double CHIPROW = CHIP_FS + 8;              // chip height
 
         public Tele T = new Tele();
-        public bool Unlocked;
+        public bool Unlocked { get; set; }
         public bool HasTcc = true;               // the game has a TC cut setting: show the TCC chip
         public double AbsDuty, TcDuty;           // 0..1 smoothed share of time the aid is cutting in
         public double LapsLeft, PerLap;          // computed by the model
@@ -385,64 +385,10 @@ namespace SimracingBR
         }
 
         // ---- lock / unlock button, shown while the mouse is over the HUD ----------------
-        public bool Hover;                        // set by the window (the HUD is click-through, so it polls the cursor)
-        string LockText { get { return Unlocked ? L.T("LOCK", "TRAVAR") : L.T("UNLOCK", "DESTRAVAR"); } }
-
-        public Rect LockBtn
-        {
-            get
-            {
-                double w = TextWidth(LockText, 11, true) + 32;
-                return new Rect(Width - w - 8, 6, w, 24);
-            }
-        }
-
-        void DrawLockButton(DrawingContext dc)
-        {
-            if (!Hover) return;
-            Rect b = LockBtn;
-            bool over = b.Contains(Mouse.GetPosition(this));
-            Brush amber = Br(255, 255, 200, 0), ink = over ? Br(255, 10, 10, 10) : Br(255, 245, 245, 245);
-            dc.DrawRoundedRectangle(over ? amber : Br(240, 30, 30, 38), new Pen(amber, 1), b, 4, 4);
-            // padlock: body + shackle (closed while locked, open while unlocked)
-            double ix = b.X + 9, iy = b.Y + 6;
-            var pen = new Pen(ink, 1.6);
-            dc.DrawRoundedRectangle(ink, null, new Rect(ix, iy + 6, 10, 8), 1.5, 1.5);
-            var sh = new StreamGeometry();
-            using (StreamGeometryContext c = sh.Open())
-            {
-                double sx = Unlocked ? ix + 5 : ix + 2;
-                c.BeginFigure(new Point(sx, iy + 6), false, false);
-                c.LineTo(new Point(sx, iy + 3), true, false);
-                c.ArcTo(new Point(sx + 6, iy + 3), new Size(3, 3), 0, false, SweepDirection.Clockwise, true, false);
-                if (!Unlocked) c.LineTo(new Point(sx + 6, iy + 6), true, false);
-            }
-            sh.Freeze();
-            dc.DrawGeometry(null, pen, sh);
-            Text(dc, LockText, 11, ink, true, b.X + 24, b.Y + 4, 0);
-        }
-
-        void DrawUnlocked(DrawingContext dc)
-        {
-            if (!Unlocked) return;
-            bool wide = Width >= 520;
-            string msg = wide ? "UNLOCKED  ·  drag to move  ·  scroll or drag corner to resize  ·  Ctrl+Shift+L to lock"
-                              : "UNLOCKED  ·  drag / scroll  ·  Ctrl+Shift+L";
-            double bw = Math.Min(wide ? 470 : 260, Width - 16);
-            Rect banner = new Rect(Width / 2 - bw / 2, Height / 2 - 12, bw, 24);
-            dc.DrawRoundedRectangle(Br(235, 255, 200, 0), null, banner, 4, 4);
-            Text(dc, msg, wide ? 10 : 9, Br(255, 10, 10, 10), true, Width / 2, banner.Y + 6, 1);
-            // resize grip (bottom-right corner)
-            var grip = new StreamGeometry();
-            using (StreamGeometryContext c = grip.Open())
-            {
-                c.BeginFigure(new Point(Width - 4, Height - 26), true, true);
-                c.LineTo(new Point(Width - 4, Height - 4), true, false);
-                c.LineTo(new Point(Width - 26, Height - 4), true, false);
-            }
-            grip.Freeze();
-            dc.DrawGeometry(Br(255, 255, 200, 0), null, grip);
-        }
+        public bool Hover { get; set; }           // set by the window (the HUD is click-through, so it polls the cursor)
+        public Rect LockBtn { get { return Chrome.LockRect(this, Width, Unlocked); } }
+        void DrawLockButton(DrawingContext dc) { Chrome.LockButton(this, dc, Unlocked, Hover); }
+        void DrawUnlocked(DrawingContext dc) { if (Unlocked) Chrome.UnlockedBanner(this, dc, Width, Height); }
 
         void FuelItem(DrawingContext dc, double x, double y, string label, string val, string unit)
         {

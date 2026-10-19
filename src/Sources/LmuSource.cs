@@ -170,19 +170,23 @@ namespace SimracingBR
         static int V(string f) { return Off(typeof(LmuVehScoring), f); }
         static int T(string f) { return Off(typeof(LmuTelem), f); }
         static readonly int S_NUMVEH = S("mNumVehicles"), S_REALTIME = S("mInRealtime"), S_PHASE = S("mGamePhase");
-        static readonly int V_ID = V("mID"), V_ISPLAYER = V("mIsPlayer"), V_INPITS = V("mInPits"), V_GARAGE = V("mInGarageStall"), V_PITSTATE = V("mPitState");
+        static readonly int S_LAPLEN = S("mLapDist");
+        // VehicleScoringInfoV01.mLapDist .. mCurSector2: lapDist, pathLateral, trackEdge, bestS1, bestS2, bestLap, lastS1, lastS2, lastLap, curS1, curS2
+        static readonly int V_TIMES = V("mLapDistToCurSector2"), V_PLACE = V("mPlace");
+        static readonly int V_ID = V("mID"),V_ISPLAYER = V("mIsPlayer"), V_INPITS = V("mInPits"), V_GARAGE = V("mInGarageStall"), V_PITSTATE = V("mPitState");
         static readonly int T_ID = T("mID"), T_ET = T("mElapsedTime"), T_LAP = T("mLapNumber"), T_LAPSTART = T("mLapStartET"),
             T_VEL = T("mLocalVel"), T_GEAR = T("mGear"), T_RPM = T("mEngineRPM"), T_GAS = T("mUnfilteredThrottle"),
             T_BRAKE = T("mUnfilteredBrake"), T_STEER = T("mUnfilteredSteering"), T_CLUTCH = T("mUnfilteredClutch"),
             T_FUEL = T("mFuel"), T_MAXRPM = T("mEngineMaxRPM"), T_FUELCAP = T("mFuelCapacity"),
             T_WHEELRANGE = T("mPhysicalSteeringWheelRange"), T_ABSACT = T("mABSActive"), T_TCACT = T("mTCActive"),
             T_TC = T("mTC"), T_TCMAX = T("mTCMax"), T_TCCUT = T("mTCCut"), T_TCCUTMAX = T("mTCCutMax"),
-            T_ABS = T("mABS"), T_ABSMAX = T("mABSMax");
+            T_ABS = T("mABS"), T_ABSMAX = T("mABSMax"), T_SECTOR = T("mCurrentSector"), T_LAPINV = T("mLapInvalidated"),
+            T_TRACK = T("mTrackName"), T_VEHNAME = T("mVehicleName");
 
         readonly double steerLock;
         readonly byte[] si = new byte[SI_LEN], veh = new byte[MAX_VEH * VEH_LEN], th = new byte[4], tb = new byte[TI_LEN];
         DateTime lastChange = DateTime.MinValue;
-        double lastET = double.NaN;
+        double lastET = double.NaN, lastDist = double.NaN, distET;
         int vehIdx = -1;
 
         public LmuSource(Settings cfg) : base(new[] { "LMU_Data" }, new[] { GEN_LEN })
@@ -242,7 +246,37 @@ namespace SimracingBR
             t.ShiftUp = t.MaxRpm > 0 && t.Rpm >= t.MaxRpm * 0.97;
             t.Status = si[S_REALTIME] != 0 ? 2 : 0;              // at the monitor / garage screen otherwise
             t.InPitBox = vehIdx >= 0 && veh[vehIdx * VEH_LEN + V_GARAGE] != 0;
+            FillLaps(t, et, nVeh);
             return true;
+        }
+
+        // Lap position, sector, lap times and the leader's times. The scoring page (lap distance) refreshes only a few
+        // times a second, so the position is dead-reckoned from the telemetry speed in between.
+        void FillLaps(Tele t, double et, int nVeh)
+        {
+            t.TrackPos = -1; t.InPitLane = false; t.HasLeader = true; t.LeaderBestMs = 0; t.LeaderLastMs = 0;
+            t.Sector = BitConverter.ToInt32(tb, T_SECTOR);
+            t.LapValid = tb[T_LAPINV] == 0;
+            t.TrackId = Str(tb, T_TRACK, 64, false) + "|" + Str(tb, T_VEHNAME, 64, false);
+            double len = BitConverter.ToDouble(si, S_LAPLEN);
+            if (vehIdx >= 0)
+            {
+                int vo = vehIdx * VEH_LEN;
+                double d = BitConverter.ToDouble(veh, vo + V_TIMES);
+                if (d != lastDist) { lastDist = d; distET = et; }
+                double est = d + Math.Max(0, Math.Min(0.5, et - distET)) * t.SpeedKmh / 3.6;
+                if (len > 100 && est >= 0 && est <= len * 1.02) t.TrackPos = (float)Math.Min(1.0, est / len);
+                t.InPitLane = veh[vo + V_INPITS] != 0;
+                t.BestLapMs = LapOrZero((long)(BitConverter.ToDouble(veh, vo + V_TIMES + 5 * 8) * 1000));
+                t.LastLapMs = LapOrZero((long)(BitConverter.ToDouble(veh, vo + V_TIMES + 8 * 8) * 1000));
+            }
+            for (int i = 0; i < nVeh; i++)
+                if (veh[i * VEH_LEN + V_PLACE] == 1)
+                {
+                    t.LeaderBestMs = LapOrZero((long)(BitConverter.ToDouble(veh, i * VEH_LEN + V_TIMES + 5 * 8) * 1000));
+                    t.LeaderLastMs = LapOrZero((long)(BitConverter.ToDouble(veh, i * VEH_LEN + V_TIMES + 8 * 8) * 1000));
+                    break;
+                }
         }
 
         double D(int off) { return BitConverter.ToDouble(tb, off); }
@@ -252,7 +286,7 @@ namespace SimracingBR
             return string.Format(CultureInfo.InvariantCulture,
                 "ver={0} loc={1} realtime={2} phase={3} nVeh={4} hasCar={5} idx={6} veh={7} layout=[gen {8} scoring {9} veh {10}x{11} telem {12} ti {13}] " +
                 "et={14:0.00} lap={15} gas={16:0.00} brk={17:0.00} clu={18:0.00} steer={19:0.000} range={20:0} gear={21} rpm={22:0} maxRpm={23:0} " +
-                "fuel={24:0.00}/{25:0.0} absAct={26} tcAct={27} tc={28}/{29} tcCut={30}/{31} abs={32}/{33} garage={34} inPits={35} pitState={36}",
+                "fuel={24:0.00}/{25:0.0} absAct={26} tcAct={27} tc={28}/{29} tcCut={30}/{31} abs={32}/{33} garage={34} inPits={35} pitState={36} lapDist={37:0.0}/{38:0.0} sector={39} bestLap={40:0.000} lastLap={41:0.000} lapInvalid={42}",
                 BitConverter.ToInt32(Pages[0], GEN_VERSION), Pages[0][APP_LOCATION], si[S_REALTIME], si[S_PHASE],
                 BitConverter.ToInt32(si, S_NUMVEH), th[2], th[1], vehIdx,
                 GEN_LEN, SCORING, VEH_LEN, MAX_VEH, TELEMETRY, TI_LEN,
@@ -260,7 +294,11 @@ namespace SimracingBR
                 BitConverter.ToSingle(tb, T_WHEELRANGE), BitConverter.ToInt32(tb, T_GEAR), D(T_RPM), D(T_MAXRPM),
                 D(T_FUEL), D(T_FUELCAP), tb[T_ABSACT], tb[T_TCACT], tb[T_TC], tb[T_TCMAX], tb[T_TCCUT], tb[T_TCCUTMAX], tb[T_ABS], tb[T_ABSMAX],
                 vehIdx >= 0 ? veh[vehIdx * VEH_LEN + V_GARAGE] : -1, vehIdx >= 0 ? veh[vehIdx * VEH_LEN + V_INPITS] : -1,
-                vehIdx >= 0 ? veh[vehIdx * VEH_LEN + V_PITSTATE] : -1);
+                vehIdx >= 0 ? veh[vehIdx * VEH_LEN + V_PITSTATE] : -1,
+                vehIdx >= 0 ? BitConverter.ToDouble(veh, vehIdx * VEH_LEN + V_TIMES) : -1, BitConverter.ToDouble(si, S_LAPLEN),
+                BitConverter.ToInt32(tb, T_SECTOR),
+                vehIdx >= 0 ? BitConverter.ToDouble(veh, vehIdx * VEH_LEN + V_TIMES + 40) : -1,
+                vehIdx >= 0 ? BitConverter.ToDouble(veh, vehIdx * VEH_LEN + V_TIMES + 64) : -1, tb[T_LAPINV]);
         }
     }
 }
