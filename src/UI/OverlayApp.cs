@@ -32,7 +32,8 @@ namespace SimracingBR
         readonly SectorsWindow sectors;
         readonly FuelWindow fuel;
         readonly ElecWindow elec;
-        readonly TyreWindow tyre;
+        // readonly TyreWindow tyre;          // tyre overlay: switched off for now, it is not working well yet (see TyreWindow.cs)
+        readonly HashSet<OverlayWindow> beta;   // overlays shown with a BETA label
         readonly OverlayWindow[] overlays;
         readonly DispatcherTimer timer = new DispatcherTimer(DispatcherPriority.Render);
         HwndSource hotkeys;            // message-only window: the hotkeys work whichever overlays are on
@@ -66,8 +67,9 @@ namespace SimracingBR
             sectors = SectorsWindow.Create(s, tele);
             fuel = FuelWindow.Create(s, tele);
             elec = ElecWindow.Create(s, tele);
-            tyre = TyreWindow.Create(s, tele);
-            overlays = new OverlayWindow[] { pedals, sectors, fuel, elec, tyre };
+            // tyre = TyreWindow.Create(s, tele);
+            overlays = new OverlayWindow[] { pedals, sectors, fuel, elec /*, tyre */ };
+            beta = new HashSet<OverlayWindow> { sectors, fuel };
             lastTarget = pedals;
             foreach (OverlayWindow w in overlays)
             {
@@ -184,7 +186,10 @@ namespace SimracingBR
 
             var header = new StackPanel();
             var title = new TextBlock { FontSize = 20, FontWeight = FontWeights.Bold };
-            header.Children.Add(title);
+            var titleBeta = BetaBadge(true);
+            var titleRow = new StackPanel { Orientation = Orientation.Horizontal };
+            titleRow.Children.Add(title); titleRow.Children.Add(titleBeta);
+            header.Children.Add(titleRow);
             header.Children.Add(new TextBlock
             {
                 Text = L.T("Changes apply instantly. The overlays show demo data while this window is open.",
@@ -211,6 +216,7 @@ namespace SimracingBR
                     rows[i].BorderBrush = i == idx ? Accent : Brushes.Transparent;
                 }
                 title.Text = overlays[idx].Title2;
+                titleBeta.Visibility = beta.Contains(overlays[idx]) ? Visibility.Visible : Visibility.Collapsed;
                 scroll.ScrollToTop();
             };
             for (int i = 0; i < overlays.Length; i++)
@@ -221,7 +227,10 @@ namespace SimracingBR
                 var sw = Switch(() => o.Enabled, v => { o.SetEnabled(v); miOn[o].Checked = v; });
                 DockPanel.SetDock(sw, Dock.Right);
                 line.Children.Add(sw);
-                line.Children.Add(new TextBlock { Text = o.Title2, FontSize = 14, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
+                var nameBox = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+                nameBox.Children.Add(new TextBlock { Text = o.Title2, FontSize = 14, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
+                if (beta.Contains(o)) nameBox.Children.Add(BetaBadge(false));
+                line.Children.Add(nameBox);
                 rows[i] = new Border { Child = line, Padding = new Thickness(15, 12, 14, 12), BorderThickness = new Thickness(3, 0, 0, 0), Cursor = Cursors.Hand, Background = Brushes.Transparent };
                 rows[i].MouseLeftButtonUp += delegate { select(idx); };
                 side.Children.Add(rows[i]);
@@ -232,13 +241,13 @@ namespace SimracingBR
             BuildSectorsPage(pages[1]);
             BuildFuelPage(pages[2]);
             BuildElecPage(pages[3]);
-            BuildTyrePage(pages[4]);
+            // BuildTyrePage(pages[4]);
 
             var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0) };
             var reset = new Button { Content = L.T("Reset this overlay", "Restaurar este overlay"), Padding = new Thickness(12, 5, 12, 5), Margin = new Thickness(0, 0, 8, 0) };
             reset.Click += delegate
             {
-                if (selected == 0) pedals.ResetDefaults(); else if (selected == 1) sectors.ResetDefaults(); else if (selected == 2) fuel.ResetDefaults(); else if (selected == 3) elec.ResetDefaults(); else tyre.ResetDefaults();
+                if (selected == 0) pedals.ResetDefaults(); else if (selected == 1) sectors.ResetDefaults(); else if (selected == 2) fuel.ResetDefaults(); else elec.ResetDefaults();   // else tyre.ResetDefaults();
                 foreach (Action r in refreshers) r();
             };
             var close = new Button { Content = L.T("Close", "Fechar"), Padding = new Thickness(18, 5, 18, 5), IsDefault = true };
@@ -319,6 +328,21 @@ namespace SimracingBR
             root.Children.Add(Legend(Color.FromRgb(36, 36, 44), L.T("Not driven yet in this lap", "Ainda não passou por aqui nesta volta")));
         }
 
+        // small "BETA" label: the overlay works but is still being tuned
+        static UIElement BetaBadge(bool big)
+        {
+            var amber = new SolidColorBrush(Color.FromRgb(255, 200, 0));
+            return new Border
+            {
+                Child = new TextBlock { Text = "BETA", FontSize = big ? 11 : 9, FontWeight = FontWeights.Bold, Foreground = amber },
+                BorderBrush = amber, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(3),
+                Padding = new Thickness(big ? 6 : 5, 1, big ? 6 : 5, 1), Margin = new Thickness(big ? 10 : 8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center
+            };
+        }
+
+        string MenuName(OverlayWindow o) { return o.Title2 + (beta.Contains(o) ? " (beta)" : ""); }
+
+
         // where an overlay is shown: on the track, on the game's setup screen, or both
         void AddVisChoice(Panel p, OverlayWindow o)
         {
@@ -385,6 +409,7 @@ namespace SimracingBR
             AddAppearance(root, fuel);
         }
 
+        /* Tyre overlay settings page: switched off for now, it is not working well yet.
         void BuildTyrePage(Panel root)
         {
             TyreView v = tyre.View;
@@ -420,6 +445,7 @@ namespace SimracingBR
             }
             AddAppearance(root, tyre);
         }
+        */
 
 
         void BuildElecPage(Panel root)
@@ -477,7 +503,7 @@ namespace SimracingBR
         // key "" = the value is not stored by the checkbox itself (set() does it)
         void AddCheck(Panel p, string label, string key, Func<bool> get, Action<bool> set, Action after)
         {
-            var cb = new CheckBox { Content = label, IsChecked = get(), Margin = new Thickness(0, 4, 0, 2), Foreground = Brushes.White };
+            var cb = new CheckBox { Content = new TextBlock { Text = label, TextWrapping = TextWrapping.Wrap, MaxWidth = 410 }, IsChecked = get(), Margin = new Thickness(0, 4, 0, 2), Foreground = Brushes.White };
             RoutedEventHandler h = delegate
             {
                 bool v = cb.IsChecked == true;
@@ -536,11 +562,11 @@ namespace SimracingBR
             foreach (OverlayWindow ov in overlays)
             {
                 OverlayWindow o = ov;
-                var on = new WF.ToolStripMenuItem(o.Title2, null, delegate { o.SetEnabled(!o.Enabled); miOn[o].Checked = o.Enabled; if (settingsWin != null) foreach (Action r in refreshers) r(); });
+                var on = new WF.ToolStripMenuItem(MenuName(o), null, delegate { o.SetEnabled(!o.Enabled); miOn[o].Checked = o.Enabled; if (settingsWin != null) foreach (Action r in refreshers) r(); });
                 on.Checked = o.Enabled;
                 miOn[o] = on; overlaysMenu.DropDownItems.Add(on);
 
-                var sub = new WF.ToolStripMenuItem(o.Title2);
+                var sub = new WF.ToolStripMenuItem(MenuName(o));
                 var items = new List<WF.ToolStripMenuItem>();
                 foreach (int pct in SizePcts)
                 {
@@ -600,7 +626,7 @@ namespace SimracingBR
             sectors.Tick(t, preview);
             fuel.Tick(t);
             elec.Tick(t);
-            tyre.Tick(t, preview);
+            // tyre.Tick(t, preview);
             bool onTrack = ShouldShow(t), force = !locked || useDemo || settingsOpen;
             bool inSetup = t.Live && t.InSetup && (!hideUnfocused || GameFocused());
             foreach (OverlayWindow w in overlays) { w.Present(force || w.WantShown(onTrack, inSetup)); w.PollHover(); }

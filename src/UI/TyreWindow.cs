@@ -1,3 +1,5 @@
+// SWITCHED OFF FOR NOW: the tyre overlay is not created by OverlayApp (it is commented out there) because it is not working well yet.
+// The code stays here so it can be switched on again.
 // The tyre overlay: hot pressure of the four tyres and the cold pressure to set after two valid laps.
 using System;
 using System.Globalization;
