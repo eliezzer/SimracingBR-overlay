@@ -120,3 +120,5 @@ Not available at the moment: the overlay is commented out in `OverlayApp.cs` unt
 The fuel and tyre overlays have a **When to show** choice in Settings: on track, on the setup screen, or both (setup screen by default). On the setup screen they appear where you place them (unlock with `Ctrl+Shift+L` to drag) and go away when you leave it, so the numbers are there while you type the setup. How the setup screen is detected: AC EVO (in the pit box, car still, engine off: found with `--probe`, the garage main menu has the engine idling), ACC (`isSetupMenuVisible`), LMU (garage stall). The game's setup files aren't touched.
 
 The **Sectors** and **Fuel** overlays are marked **BETA** in the settings menu and the tray menu: they work, but are still being tuned.
+
+In a **solo Race Weekend** of AC EVO the race length is read from the game's own log (`Saved Games\ACE\Logs\log-*.txt`, the "Game Started!" line; the file is only read) so the fuel overlay knows it already in practice and qualifying. Online servers don't write that line: there the overlay uses your setting, or the last race it saw.
