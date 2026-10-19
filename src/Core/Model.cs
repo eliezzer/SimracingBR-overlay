@@ -47,6 +47,7 @@ namespace SimracingBR
         public int SessionLaps;                    // race length in laps, 0 = unknown or time based
         public int SessionTimeLeftMs = -1;         // time left in the session, -1 = unknown
         public bool SessionIsRace;
+        public int RaceLengthSec, RaceLengthLaps;   // race length of a solo event read from the game log (any session), 0 = unknown
         public float FuelCap;                      // tank capacity in litres, 0 = unknown
         // electronics (electronics overlay), -1 = the car / game doesn't have it
         public int TcMax = -1, TcCutMax = -1, AbsMax = -1, EscLevel = -1, EscMax = -1, EngineMap = -1, EngineMapMax = -1;
@@ -63,7 +64,7 @@ namespace SimracingBR
         // forget the optional fuel / electronics values of the previous game or car
         public void ClearExtras()
         {
-            LapCount = -1; SessionLaps = 0; SessionTimeLeftMs = -1; SessionIsRace = false; FuelCap = 0;
+            LapCount = -1; SessionLaps = 0; SessionTimeLeftMs = -1; SessionIsRace = false; FuelCap = 0; RaceLengthSec = RaceLengthLaps = 0;
             TcMax = TcCutMax = AbsMax = EscLevel = EscMax = EngineMap = EngineMapMax = -1;
             BrakeBias = DiffPower = DiffCoast = BatteryPct = EnergyPct = -1; Drs = -1;
             for (int i = 0; i < 4; i++) TyrePsi[i] = TyreTemp[i] = TyreColdPsi[i] = -1;

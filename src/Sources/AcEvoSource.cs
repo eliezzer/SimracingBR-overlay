@@ -87,6 +87,7 @@ namespace SimracingBR
             G_ELECMAX = G("electronicsMax"), G_DIFFP = G("diffPowerRaw"), G_DIFFC = G("diffCoastRaw"), G_KERS = G("kersCurrentPerc"), G_HASKERS = G("hasKers"), G_DRSAVAIL = G("isDrsAvailable"), G_NPOS = G("npos"), G_LASTLAP = G("lastLaptimeMs"), G_BESTLAP = G("bestLaptimeMs"), G_VALID = G("isValidLap"), G_CAR = G("carModel");
         static readonly int GFX_LEN = G("isValidLap") + 1;
 
+        readonly EvoLog log = new EvoLog(null);       // session lengths of a solo event (see EvoLog.cs)
         DateTime lastChange = DateTime.MinValue;
         int lastPacket = -1;
 
@@ -146,6 +147,7 @@ namespace SimracingBR
             t.SessionIsRace = Str(Pages[2], 36, 24, false) == "Race";
             t.SessionTimeLeftMs = ParseClockMs(Str(gb, G_SESSION + 33, 20, false));
             t.SessionLaps = 0;                                       // not published
+            log.Poll(); t.RaceLengthSec = log.RaceSeconds; t.RaceLengthLaps = log.RaceLaps;   // solo events only: known in practice and qualifying too
             t.TcMax = (sbyte)gb[G_ELECMAX]; t.TcCutMax = (sbyte)gb[G_ELECMAX + 1]; t.AbsMax = (sbyte)gb[G_ELECMAX + 2];
             t.EscLevel = (sbyte)gb[G_ELEC + 3]; t.EscMax = (sbyte)gb[G_ELECMAX + 3];
             t.EngineMap = -1; t.EngineMapMax = -1;

@@ -105,6 +105,7 @@ namespace SimracingBR
                 sub += "  ·  " + M.PerLap.ToString("0.00", CultureInfo.InvariantCulture) + " L" + L.T("/lap", "/volta");
                 if (M.TimedRace) sub += "  ·  " + L.T("lap ", "volta ") + Chrome.Time(M.BestValidLapMs > 0 ? M.BestValidLapMs : T.BestLapMs);
                 if (M.RaceSource == 3) sub += "  ·  " + L.T("last race", "última corrida");
+                else if (M.RaceSource == 4) sub += "  ·  " + L.T("from the game", "do jogo");
                 else if (M.RaceSource == 1) sub += "  ·  " + L.T("set by you", "definido por você");
             }
             else if (M.PerLap <= 0) sub = L.T("measuring consumption (one full lap)...", "medindo o consumo (uma volta completa)...");

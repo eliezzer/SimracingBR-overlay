@@ -32,7 +32,7 @@ namespace SimracingBR
         public int RaceMinutes;                    // total time of a timed race, 0 = lap race / unknown
         public double RaceFuel = -1;               // litres for the whole race, -1 = unknown
         public bool TimedRace;                     // the race laps came from the clock
-        public int RaceSource;                     // where the race length comes from: 0 unknown, 1 your setting, 2 the game, 3 the last race seen
+        public int RaceSource;                     // where the race length comes from: 0 unknown, 1 your setting, 2 the game (race session), 3 the last race seen, 4 the game log (solo event)
 
         // lap in progress
         int prevLapMs, prevLapCount = -1;
@@ -105,21 +105,24 @@ namespace SimracingBR
         {
             RaceLaps = -1; RaceFuel = -1; RaceMinutes = 0; TimedRace = false; RaceSource = 0;
             int lap = BestValidLapMs > 0 ? BestValidLapMs : (t.BestLapMs > 0 ? t.BestLapMs : 0);
-            int laps = 0, minutes = 0;
+            int laps = 0, seconds = 0;
 
-            // the race length: your setting, else what the game says (only in the race session), else the last race seen
+            // the race length: your setting, else the game's log (solo events: known before the race), else what the game says
+            // in the race session itself, else the last race seen
             if (ManualRaceLaps > 0) { laps = ManualRaceLaps; RaceSource = 1; }
-            else if (ManualRaceMinutes > 0) { minutes = ManualRaceMinutes; RaceSource = 1; }
+            else if (ManualRaceMinutes > 0) { seconds = ManualRaceMinutes * 60; RaceSource = 1; }
+            else if (t.RaceLengthLaps > 0) { laps = t.RaceLengthLaps; RaceSource = 4; }
+            else if (t.RaceLengthSec > 0) { seconds = t.RaceLengthSec; RaceSource = 4; }
             else if (t.SessionIsRace && t.SessionLaps > 0) { laps = t.SessionLaps; RaceSource = 2; Learn(laps, 0); }
-            else if (t.SessionIsRace && raceStartClockMs > 0) { minutes = (int)Math.Round(raceStartClockMs / 60000.0); RaceSource = 2; Learn(0, minutes); }
+            else if (t.SessionIsRace && raceStartClockMs > 0) { int min = (int)Math.Round(raceStartClockMs / 60000.0); seconds = min * 60; RaceSource = 2; Learn(0, min); }
             else if (learnedIsLaps && learnedLaps > 0) { laps = learnedLaps; RaceSource = 3; }
-            else if (learnedMinutes > 0) { minutes = learnedMinutes; RaceSource = 3; }
+            else if (learnedMinutes > 0) { seconds = learnedMinutes * 60; RaceSource = 3; }
 
             if (laps > 0) RaceLaps = laps;
-            else if (minutes > 0)
+            else if (seconds > 0)
             {
-                TimedRace = true; RaceMinutes = minutes;
-                if (lap > 0) RaceLaps = minutes * 60000.0 / lap + 0.5;
+                TimedRace = true; RaceMinutes = (int)Math.Round(seconds / 60.0);
+                if (lap > 0) RaceLaps = seconds * 1000.0 / lap + 0.5;
             }
             if (RaceLaps >= 0 && PerLap > 0.01) RaceFuel = (RaceLaps + MarginLaps) * PerLap;
         }
