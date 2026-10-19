@@ -303,8 +303,8 @@ namespace SimracingBR
 
             AddSection(root, L.T("COLORS", "CORES"));
             root.Children.Add(Legend(v.CPurple, L.T("Best of the session (everyone where the game shows it, else yours)", "Melhor da sessão (de todos onde o jogo informa, senão o seu)")));
-            root.Children.Add(Legend(v.CGreen, L.T("Faster than your previous lap on that stretch", "Mais rápido que a sua volta anterior no trecho")));
-            root.Children.Add(Legend(v.CYellow, L.T("Slower than your previous lap on that stretch", "Mais lento que a sua volta anterior no trecho")));
+            root.Children.Add(Legend(v.CGreen, L.T("Faster than the same stretch of your best lap", "Mais rápido que o mesmo trecho da sua melhor volta")));
+            root.Children.Add(Legend(v.CYellow, L.T("Slower than the same stretch of your best lap", "Mais lento que o mesmo trecho da sua melhor volta")));
             root.Children.Add(Legend(Color.FromRgb(36, 36, 44), L.T("Nothing to compare yet", "Ainda sem referência")));
         }
 
