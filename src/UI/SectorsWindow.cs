@@ -31,6 +31,7 @@ namespace SimracingBR
             view.CSlower = s.Col("ColorSecSlower", "#62626C");
             var w = new SectorsWindow(s, view, live, demo);
             w.LoadFlags();
+            w.SetAssumePurple(s.Bool("SectorsPurpleBest", false));
             return w;
         }
 
@@ -43,6 +44,8 @@ namespace SimracingBR
         }
 
         public int Subs { get { return live.Subs; } }
+        public bool AssumePurple { get { return live.AssumePurple; } }
+        public void SetAssumePurple(bool on) { live.AssumePurple = on; demoTracker.AssumePurple = on; }
 
         public void LayoutChanged() { Reflow(View.Relayout); }
 
@@ -58,7 +61,7 @@ namespace SimracingBR
         public void ResetDefaults()
         {
             foreach (string k in FlagKeys) cfg.Set(k, "1");
-            cfg.Set(SubsKey, DefaultSubs.ToString());
+            cfg.Set(SubsKey, DefaultSubs.ToString()); cfg.Set("SectorsPurpleBest", "0"); SetAssumePurple(false);
             live.Configure(DefaultSubs); demoTracker.Configure(DefaultSubs);
             Reflow(LoadFlags);
             ApplyScale(1.0, true);

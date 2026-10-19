@@ -34,6 +34,7 @@ namespace SimracingBR
         public int OwnBestMs, OwnLastMs;       // lap times seen by the tracker (used when the game doesn't publish them)
 
         // references
+        public bool AssumePurple;              // setting: paint your best purple even when the game says nothing about the other drivers
         bool alone = true;                     // you are the only driver in the session (or the game does not say)
         int[] othersSec = new int[Main];       // best main-sector times of all drivers (ms, 0 = the game doesn't say)
         double[] secT, secBest;                // what each main sector was scored with (to score it again)
@@ -131,7 +132,7 @@ namespace SimracingBR
 
             float pos = t.TrackPos;
             for (int m = 0; m < Main; m++) othersSec[m] = t.SessionBestSecMs[m];
-            alone = t.Drivers <= 1;                   // unknown counts as alone
+            alone = t.Drivers <= 1 || AssumePurple;   // unknown counts as alone
             if (!t.LapValid) lapValid = false;
             if (t.InPitLane) Unclean("pit lane");
 

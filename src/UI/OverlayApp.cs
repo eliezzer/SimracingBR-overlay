@@ -293,6 +293,7 @@ namespace SimracingBR
             AddSection(root, L.T("SECTORS", "SETORES"));
             AddSlider(root, L.T("Sub-sectors in each sector", "Subsetores em cada setor"), 1, 12, 1, () => sectors.Subs,
                 x => sectors.SetSubs((int)Math.Round(x)), x => Math.Round(x).ToString(CultureInfo.InvariantCulture));
+            AddCheck(root, L.T("Paint my best purple when the game does not show other drivers (AC EVO, ACC)", "Pintar meu melhor de roxo quando o jogo não mostra os outros pilotos (AC EVO, ACC)"), "SectorsPurpleBest", () => sectors.AssumePurple, x => sectors.SetAssumePurple(x), null);
             AddCheck(root, L.T("Sector time inside S1 / S2 / S3", "Tempo do setor dentro de S1 / S2 / S3"), "SectorsShowSectorTimes", () => v.ShowSectorTimes, x => v.ShowSectorTimes = x, after);
 
             AddSection(root, L.T("LAP TIMES", "TEMPOS DE VOLTA"));

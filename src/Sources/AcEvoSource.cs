@@ -88,8 +88,8 @@ namespace SimracingBR
         DateTime lastChange = DateTime.MinValue;
         int lastPacket = -1;
 
-        // the static page (4 KB) has the track at 136 and its layout at 168 (found with --dump); only used to tell tracks apart
-        const int STATIC_LEN = 4096, S_TRACK = 136, S_LAYOUT = 168;
+        // the static page (4 KB) has the track at 136 and its layout at 169 (found with --dump); only used to tell tracks apart
+        const int STATIC_LEN = 4096, S_TRACK = 136, S_LAYOUT = 169;
         public AcEvoSource() : base(new[] { "Local\\acevo_pmf_physics", "Local\\acevo_pmf_graphics", "Local\\acevo_pmf_static" }, new[] { AcPhys.LEN, GFX_LEN, STATIC_LEN }) { }
 
         public override string Name { get { return "AC EVO"; } }
