@@ -69,14 +69,14 @@ namespace SimracingBR
             // With the graph: [graph + bars] with the fuel strip below (chips live inside the graph).
             // Without it: bars, ABS/TC/TCC chips and fuel sit side by side, so there is no wide empty strip.
             // (fuel alone next to the dash/wheel also stacks, otherwise a 28 px strip would float in a 104 px row)
-            compact = !ShowGraph && (ShowBars || ShowAids || (fuelAny && (hasGear || ShowWheel)));
+            compact = !ShowGraph && (ShowBars || ChipsOn || (fuelAny && (hasGear || ShowWheel)));
             if (compact)
             {
                 // info column: fuel card on top, ABS / TC / TCC chips in one row below it (bigger font)
                 int nFuel = (ShowFuel ? 1 : 0) + (ShowFuelPerLap ? 1 : 0) + (ShowLapsLeft ? 1 : 0);
-                chipsW = ShowAids ? ChipsW() : 0;
+                chipsW = ChipsOn ? ChipsW() : 0;
                 fuelCardH = nFuel > 0 ? nFuel * FUEL_ROW + 12 : 0;
-                double chipsH = ShowAids ? CHIPROW : 0;
+                double chipsH = ChipsOn ? CHIPROW : 0;
                 infoW = Math.Max(nFuel > 0 ? CompactFuelW() : 0, chipsW);
                 infoH = fuelCardH + (fuelCardH > 0 && chipsH > 0 ? 6 : 0) + chipsH;
                 compactH = Math.Max(ROW, infoH);
@@ -89,7 +89,7 @@ namespace SimracingBR
             {
                 rowMain = ShowGraph || ShowBars;
                 rowFuel = fuelAny;
-                rowAids = ShowAids && ShowGraph;      // ABS / TC / TCC chips: own row below the fuel strip
+                rowAids = ChipsOn && ShowGraph;      // ABS / TC / TCC chips: own row below the fuel strip
                 chipsW = rowAids ? ChipsW() : 0;
                 double wMain = (ShowGraph ? 300 : 0) + (ShowGraph && ShowBars ? 10 : 0) + barsW;
                 double wFuel = rowFuel ? 20 + (ShowFuel ? FuelItemW(LblFuel, "000.0", "L") : 0) + (ShowFuelPerLap ? FuelItemW(LblPerLap, "0.00", "L") : 0) + (ShowLapsLeft ? FuelItemW(LblLaps, "00.0", "") : 0) : 0;
@@ -245,24 +245,47 @@ namespace SimracingBR
                 if (ShowLapsLeft) FuelRow(dc, x, ry, infoW, LblLaps, LapsLeft > 0 ? LapsLeft.ToString("0.0", CultureInfo.InvariantCulture) : "--", "");
                 iy += fuelCardH + 6;
             }
-            if (ShowAids) DrawAidsRow(dc, x, iy, infoW);
+            if (ChipsOn) DrawAidsRow(dc, x, iy, infoW);
         }
-
-        // ABS / TC (/ TCC) chips in one row, spread across width w
+        // ABS / TC (/ TCC) chips and the brake bias chip in one row, spread across width w
         // (graph layout: below the fuel strip; compact layout: below the fuel card)
+        public bool ShowBias = true;             // show the brake bias chip (when the car and the game have it)
+        public bool HasBias;                     // set by the window: the game publishes the brake bias
+        bool BiasOn { get { return ShowBias && HasBias; } }
+        bool ChipsOn { get { return ShowAids || BiasOn; } }
+        double BiasW() { return TextWidth("BB 88.8%", CHIP_FS, true) + 14; }
+
         void DrawAidsRow(DrawingContext dc, double x, double y, double w)
         {
-            double wA = ChipW("ABS", true, CHIP_FS), wT = ChipW("TC", true, CHIP_FS), wC = HasTcc ? ChipW("TCC", false, CHIP_FS) : 0;
-            double gap = (w - wA - wT - wC) / (HasTcc ? 2 : 1);
-            double xr = x + wA;
-            DrawChip(dc, xr, y, wA, "ABS", T.AbsLevel, CAbs, AbsDuty, T.AbsOn, true, CHIP_FS); xr += gap + wT;
-            DrawChip(dc, xr, y, wT, "TC", T.TcLevel, CTc, TcDuty, T.TcOn, true, CHIP_FS); xr += gap + wC;
-            if (HasTcc) DrawChip(dc, xr, y, wC, "TCC", T.TcCutLevel, CTc, TcDuty, T.TcOn, false, CHIP_FS);
+            var ws = new List<double>();
+            var draws = new List<Action<double, double>>();
+            if (ShowAids)
+            {
+                ws.Add(ChipW("ABS", true, CHIP_FS)); draws.Add(delegate (double xr, double cw) { DrawChip(dc, xr, y, cw, "ABS", T.AbsLevel, CAbs, AbsDuty, T.AbsOn, true, CHIP_FS); });
+                ws.Add(ChipW("TC", true, CHIP_FS)); draws.Add(delegate (double xr, double cw) { DrawChip(dc, xr, y, cw, "TC", T.TcLevel, CTc, TcDuty, T.TcOn, true, CHIP_FS); });
+                if (HasTcc) { ws.Add(ChipW("TCC", false, CHIP_FS)); draws.Add(delegate (double xr, double cw) { DrawChip(dc, xr, y, cw, "TCC", T.TcCutLevel, CTc, TcDuty, T.TcOn, false, CHIP_FS); }); }
+            }
+            if (BiasOn) { ws.Add(BiasW()); draws.Add(delegate (double xr, double cw) { DrawBiasChip(dc, xr, y, cw); }); }
+            double sum = 0; foreach (double v in ws) sum += v;
+            double gap = ws.Count > 1 ? (w - sum) / (ws.Count - 1) : 0, right = x;
+            for (int i = 0; i < ws.Count; i++) { right += ws[i]; draws[i](right, ws[i]); right += gap; }
+        }
+
+        // "BB 58.0%": share of the braking on the front axle (the car's brake bias setting)
+        void DrawBiasChip(DrawingContext dc, double xr, double y, double w)
+        {
+            double h = CHIP_FS + 8;
+            dc.DrawRoundedRectangle(Br(Color.FromRgb(36, 36, 44)), null, new Rect(xr - w, y, w, h), 3, 3);
+            string txt = "BB " + (T.BrakeBias * 100).ToString("0.0", CultureInfo.InvariantCulture) + "%";
+            Text(dc, txt, CHIP_FS, Br(255, 200, 200, 208), true, xr - w / 2, y + (h - CHIP_FS * 1.25) / 2, 1);
         }
 
         double ChipsW()
         {
-            return ChipW("ABS", true, CHIP_FS) + ChipW("TC", true, CHIP_FS) + 5 + (HasTcc ? ChipW("TCC", false, CHIP_FS) + 5 : 0);
+            double sum = 0; int n = 0;
+            if (ShowAids) { sum += ChipW("ABS", true, CHIP_FS) + ChipW("TC", true, CHIP_FS); n += 2; if (HasTcc) { sum += ChipW("TCC", false, CHIP_FS); n++; } }
+            if (BiasOn) { sum += BiasW(); n++; }
+            return sum + 5 * Math.Max(0, n - 1);
         }
 
         // one line of the fuel card: label on the left, value (and unit) right-aligned

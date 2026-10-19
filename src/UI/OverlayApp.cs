@@ -280,6 +280,7 @@ namespace SimracingBR
             AddCheck(root, L.T("Pedal bars", "Barras dos pedais"), "ShowBars", () => v.ShowBars, x => v.ShowBars = x, after);
             AddCheck(root, L.T("Clutch (bar and graph line)", "Embreagem (barra e linha do gráfico)"), "ShowClutch", () => v.ShowClutch, x => v.ShowClutch = x, after);
             AddCheck(root, L.T("ABS / TC levels and activity", "Níveis e atuação de ABS / TC"), "ShowAids", () => v.ShowAids, x => v.ShowAids = x, after);
+            AddCheck(root, L.T("Brake bias (when the game publishes it)", "Balança de freio (quando o jogo publica)"), "ShowBias", () => v.ShowBias, x => v.ShowBias = x, after);
 
             AddSection(root, L.T("DASH", "PAINEL"));
             AddCheck(root, L.T("Gear", "Marcha"), "ShowGear", () => v.ShowGear, x => v.ShowGear = x, after);
