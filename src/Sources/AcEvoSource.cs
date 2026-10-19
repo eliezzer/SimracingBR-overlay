@@ -70,7 +70,8 @@ namespace SimracingBR
     public static class AcPhys
     {
         public const int PACKET = 0, GAS = 4, BRAKE = 8, FUEL = 12, GEAR = 16, RPM = 20, STEER = 24, SPEED = 28,
-                         TC = 204, ABS = 252, AUTOSHIFT = 264, CLUTCH = 364, MAXRPM = 588, TCACT = 672, ABSACT = 676;
+                         TC = 204, ABS = 252, AUTOSHIFT = 264, CLUTCH = 364, MAXRPM = 588, TCACT = 672, ABSACT = 676,
+                         PRESSURE = 88, CORETEMP = 152;   // wheelsPressure[4] (psi), tyreCoreTemperature[4] (C)
         public const int LEN = 800;
     }
 
@@ -137,6 +138,7 @@ namespace SimracingBR
             t.TrackId = Str(Pages[2], S_TRACK, 32, false) + "/" + Str(Pages[2], S_LAYOUT, 32, false) + "|" + Str(gb, G_CAR, 33, false);
             // session / fuel / electronics for the fuel and electronics overlays
             t.ClearExtras();
+            FillTyres(t, pb);
             t.LapCount = BitConverter.ToInt32(gb, G_LAPCOUNT);
             float fpct = BitConverter.ToSingle(gb, G_FUELPCT);
             t.FuelCap = (fpct > 0.01f && fpct <= 1.001f && t.Fuel > 0) ? t.Fuel / fpct : 0;

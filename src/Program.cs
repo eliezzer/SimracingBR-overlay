@@ -128,7 +128,9 @@ namespace SimracingBR
                             " lapCount=" + t.LapCount + " race=" + t.SessionIsRace + " raceLaps=" + t.SessionLaps + " timeLeftMs=" + t.SessionTimeLeftMs + " drivers=" + t.Drivers +
                             " tc=" + t.TcLevel + "/" + t.TcMax + " tcc=" + t.TcCutLevel + "/" + t.TcCutMax + " abs=" + t.AbsLevel + "/" + t.AbsMax + " esc=" + t.EscLevel + "/" + t.EscMax +
                             " map=" + t.EngineMap + "/" + t.EngineMapMax + " bias=" + t.BrakeBias.ToString("0.000", CultureInfo.InvariantCulture) + " diff=" + t.DiffPower.ToString("0.00", CultureInfo.InvariantCulture) + "/" + t.DiffCoast.ToString("0.00", CultureInfo.InvariantCulture) +
-                            " batt=" + t.BatteryPct.ToString("0", CultureInfo.InvariantCulture) + " energy=" + t.EnergyPct.ToString("0", CultureInfo.InvariantCulture) + " drs=" + t.Drs);
+                            " batt=" + t.BatteryPct.ToString("0", CultureInfo.InvariantCulture) + " energy=" + t.EnergyPct.ToString("0", CultureInfo.InvariantCulture) + " drs=" + t.Drs +
+                            " psi=" + t.TyrePsi[0].ToString("0.0", CultureInfo.InvariantCulture) + "/" + t.TyrePsi[1].ToString("0.0", CultureInfo.InvariantCulture) + "/" + t.TyrePsi[2].ToString("0.0", CultureInfo.InvariantCulture) + "/" + t.TyrePsi[3].ToString("0.0", CultureInfo.InvariantCulture) +
+                            " tyreTemp=" + t.TyreTemp[0].ToString("0", CultureInfo.InvariantCulture) + "/" + t.TyreTemp[1].ToString("0", CultureInfo.InvariantCulture) + "/" + t.TyreTemp[2].ToString("0", CultureInfo.InvariantCulture) + "/" + t.TyreTemp[3].ToString("0", CultureInfo.InvariantCulture));
                         w.Flush();
                     }
                     System.Threading.Thread.Sleep(50);

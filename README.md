@@ -108,3 +108,9 @@ Two more overlays, off by default (switch them on in **Settings**; the pedals ov
 - **Electronics**: ABS / TC / TCC / ESC chips that light up while the aid acts, plus brake bias, engine map, differential, hybrid battery, virtual energy (LMU) and DRS. Only what the car and the game publish is shown (an AC EVO GT3 shows ABS, TC, brake bias and differential; a hypercar in LMU adds map, battery and energy).
 
 `--probe` logs the values both overlays read (`extras:` line). What each game publishes: AC EVO (race length only as the time left, from the session clock), ACC (laps, time left, engine map, brake bias), LMU (laps, time left, map, brake bias, battery, virtual energy, DRS), AMS2 (laps, time left, brake bias, DRS). Only AC EVO was checked against a real session.
+
+## Tyre pressure overlay
+
+A fifth overlay (off by default): the hot pressure of the four tyres (green within 0.5 psi of the target, amber within 1, red beyond), their core temperature, and, after two valid laps, the **cold pressure to put in the setup** so that the hot pressure ends up at the target (27.0 psi by default).
+
+`advice = target * cold / hot`: the cold pressure is the one the car shows standing in the pits at the start of the session (or what you type in Settings), the hot one is the average over the last valid lap. Example: setup 25.5, hot 27.9 -> 27.0 * 25.5 / 27.9 = 24.7. The out lap and invalid laps don't count; if the pressure is still rising it says so (check again after another lap). Needs a game that publishes the tyre pressure: AC EVO and ACC (physics page, `wheelsPressure` / `tyreCoreTemperature`). Settings: target, number of valid laps, optional setup pressure per wheel.

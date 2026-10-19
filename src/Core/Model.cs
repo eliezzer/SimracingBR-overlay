@@ -55,6 +55,9 @@ namespace SimracingBR
         public float BatteryPct = -1;              // hybrid battery / ERS charge, 0..100
         public float EnergyPct = -1;               // virtual energy left (LMU hypercars), 0..100
         public int Drs = -1;                       // -1 none, 0 off, 1 available, 2 open
+        public float[] TyrePsi = { -1, -1, -1, -1 };      // pressure of each tyre in psi (FL, FR, RL, RR), -1 = unknown
+        public float[] TyreTemp = { -1, -1, -1, -1 };     // core temperature of each tyre in degrees C, -1 = unknown
+        public float[] TyreColdPsi = { -1, -1, -1, -1 };  // the cold / setup pressure when the game publishes it, -1 = unknown
 
         // forget the optional fuel / electronics values of the previous game or car
         public void ClearExtras()
@@ -62,6 +65,7 @@ namespace SimracingBR
             LapCount = -1; SessionLaps = 0; SessionTimeLeftMs = -1; SessionIsRace = false; FuelCap = 0;
             TcMax = TcCutMax = AbsMax = EscLevel = EscMax = EngineMap = EngineMapMax = -1;
             BrakeBias = DiffPower = DiffCoast = BatteryPct = EnergyPct = -1; Drs = -1;
+            for (int i = 0; i < 4; i++) TyrePsi[i] = TyreTemp[i] = TyreColdPsi[i] = -1;
         }
     }
 
@@ -189,6 +193,17 @@ namespace SimracingBR
             catch { return ""; }
         }
 
+
+        // tyre pressure (psi) and core temperature of the four tyres from the physics page (AC layout: wheelsPressure @88, tyreCoreTemperature @152)
+        protected static void FillTyres(Tele t, byte[] physics)
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                float p = BitConverter.ToSingle(physics, AcPhys.PRESSURE + 4 * i), c = BitConverter.ToSingle(physics, AcPhys.CORETEMP + 4 * i);
+                t.TyrePsi[i] = p > 8 && p < 80 ? p : -1;
+                t.TyreTemp[i] = c > -20 && c < 400 ? c : -1;
+            }
+        }
         // a game lap time in ms, or 0 while it isn't a real lap time yet
         protected static int LapOrZero(long ms) { return ms > 0 && ms < 3600000 ? (int)ms : 0; }
 

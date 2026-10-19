@@ -130,6 +130,7 @@ namespace SimracingBR
             t.Drivers = BitConverter.ToInt32(gb, G_DRIVERS);
             t.TrackId = Str(sb, S_TRACK, 66, true) + "|" + Str(sb, S_CAR, 66, true);
             t.ClearExtras();
+            FillTyres(t, pb);
             t.LapCount = BitConverter.ToInt32(gb, G_LAPS);
             float maxFuel = BitConverter.ToSingle(sb, S_MAXFUEL);
             t.FuelCap = maxFuel > 0 && maxFuel < 1000 ? maxFuel : 0;

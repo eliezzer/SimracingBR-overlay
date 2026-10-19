@@ -1,4 +1,4 @@
-// The application: owns the telemetry, the overlays (pedals, sectors, fuel, electronics), the tray icon, the hotkeys and the settings window.
+// The application: owns the telemetry, the overlays (pedals, sectors, fuel, electronics, tyres), the tray icon, the hotkeys and the settings window.
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -32,6 +32,7 @@ namespace SimracingBR
         readonly SectorsWindow sectors;
         readonly FuelWindow fuel;
         readonly ElecWindow elec;
+        readonly TyreWindow tyre;
         readonly OverlayWindow[] overlays;
         readonly DispatcherTimer timer = new DispatcherTimer(DispatcherPriority.Render);
         HwndSource hotkeys;            // message-only window: the hotkeys work whichever overlays are on
@@ -65,7 +66,8 @@ namespace SimracingBR
             sectors = SectorsWindow.Create(s, tele);
             fuel = FuelWindow.Create(s, tele);
             elec = ElecWindow.Create(s, tele);
-            overlays = new OverlayWindow[] { pedals, sectors, fuel, elec };
+            tyre = TyreWindow.Create(s, tele);
+            overlays = new OverlayWindow[] { pedals, sectors, fuel, elec, tyre };
             lastTarget = pedals;
             foreach (OverlayWindow w in overlays)
             {
@@ -230,12 +232,13 @@ namespace SimracingBR
             BuildSectorsPage(pages[1]);
             BuildFuelPage(pages[2]);
             BuildElecPage(pages[3]);
+            BuildTyrePage(pages[4]);
 
             var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0) };
             var reset = new Button { Content = L.T("Reset this overlay", "Restaurar este overlay"), Padding = new Thickness(12, 5, 12, 5), Margin = new Thickness(0, 0, 8, 0) };
             reset.Click += delegate
             {
-                if (selected == 0) pedals.ResetDefaults(); else if (selected == 1) sectors.ResetDefaults(); else if (selected == 2) fuel.ResetDefaults(); else elec.ResetDefaults();
+                if (selected == 0) pedals.ResetDefaults(); else if (selected == 1) sectors.ResetDefaults(); else if (selected == 2) fuel.ResetDefaults(); else if (selected == 3) elec.ResetDefaults(); else tyre.ResetDefaults();
                 foreach (Action r in refreshers) r();
             };
             var close = new Button { Content = L.T("Close", "Fechar"), Padding = new Thickness(18, 5, 18, 5), IsDefault = true };
@@ -341,6 +344,42 @@ namespace SimracingBR
 
             AddAppearance(root, fuel);
         }
+
+        void BuildTyrePage(Panel root)
+        {
+            TyreView v = tyre.View;
+            Action after = tyre.LayoutChanged;
+            root.Children.Add(new TextBlock
+            {
+                Text = L.T("After the valid laps asked for, it tells you the COLD pressure to put in the setup so that the hot pressure ends up at the target: target x cold / hot. Example: setup 25.5, hot 27.9 -> 24.7. The cold value is the pressure the car shows at the start of the session, standing in the pits (or the value typed below). Needs a game that publishes tyre pressure (AC EVO, ACC).",
+                           "Depois das voltas válidas pedidas, ele diz a pressão A FRIO para colocar no setup para que a pressão a quente fique no alvo: alvo x frio / quente. Exemplo: setup 25,5, quente 27,9 -> 24,7. O valor a frio é a pressão que o carro mostra no começo da sessão, parado no box (ou o valor digitado abaixo). Precisa de um jogo que publique a pressão dos pneus (AC EVO, ACC)."),
+                Foreground = Muted, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 12, 0, 0)
+            });
+            AddSection(root, L.T("TARGET", "ALVO"));
+            AddSlider(root, L.T("Hot pressure target (psi)", "Pressão alvo a quente (psi)"), 20, 35, 0.1, () => tyre.Target,
+                x => tyre.SetTarget(x), x => x.ToString("0.0", CultureInfo.InvariantCulture));
+            AddSlider(root, L.T("Valid laps before the suggestion", "Voltas válidas antes da sugestão"), 1, 5, 1, () => tyre.LapsNeeded,
+                x => tyre.SetLapsNeeded((int)Math.Round(x)), x => Math.Round(x).ToString(CultureInfo.InvariantCulture));
+            AddSection(root, L.T("SHOW", "MOSTRAR"));
+            AddCheck(root, L.T("Tyre core temperature", "Temperatura do núcleo do pneu"), "TyreShowTemps", () => v.ShowTemps, x => v.ShowTemps = x, after);
+            AddCheck(root, L.T("Suggested cold pressure", "Pressão a frio sugerida"), "TyreShowAdvice", () => v.ShowAdvice, x => v.ShowAdvice = x, after);
+            AddSection(root, L.T("SETUP PRESSURE (OPTIONAL)", "PRESSÃO DO SETUP (OPCIONAL)"));
+            root.Children.Add(new TextBlock
+            {
+                Text = L.T("Only if the overlay can't tell the setup pressure itself (for example you opened it after leaving the pits). 0 = automatic.",
+                           "Só se o overlay não conseguir saber a pressão do setup sozinho (por exemplo, você o abriu depois de sair do box). 0 = automático."),
+                Foreground = Muted, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0)
+            });
+            string[] names = { L.T("Front left", "Dianteiro esquerdo"), L.T("Front right", "Dianteiro direito"), L.T("Rear left", "Traseiro esquerdo"), L.T("Rear right", "Traseiro direito") };
+            for (int i = 0; i < 4; i++)
+            {
+                int w = i;
+                AddSlider(root, names[i], 0, 35, 0.1, () => tyre.ColdOverride(w), x => tyre.SetColdOverride(w, x),
+                    x => x < 0.05 ? L.T("auto", "auto") : x.ToString("0.0", CultureInfo.InvariantCulture));
+            }
+            AddAppearance(root, tyre);
+        }
+
 
         void BuildElecPage(Panel root)
         {
@@ -520,6 +559,7 @@ namespace SimracingBR
             sectors.Tick(t, preview);
             fuel.Tick(t);
             elec.Tick(t);
+            tyre.Tick(t, preview);
             bool want = ShouldShow(t);
             foreach (OverlayWindow w in overlays) { w.Present(want); w.PollHover(); }
         }
