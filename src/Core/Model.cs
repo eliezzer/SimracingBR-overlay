@@ -38,6 +38,7 @@ namespace SimracingBR
         public int LastLapMs, BestLapMs;           // the player's own, 0 = none yet
         public bool HasLeader;                     // the game publishes the race leader's lap times
         public int LeaderBestMs, LeaderLastMs;     // 0 = none yet
+        public int SessionBestMs;                  // fastest lap of anyone in the session, 0 = unknown
         public string TrackId = "";                // track + car: start from scratch when either changes
     }
 

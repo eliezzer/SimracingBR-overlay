@@ -254,7 +254,7 @@ namespace SimracingBR
         // times a second, so the position is dead-reckoned from the telemetry speed in between.
         void FillLaps(Tele t, double et, int nVeh)
         {
-            t.TrackPos = -1; t.InPitLane = false; t.HasLeader = true; t.LeaderBestMs = 0; t.LeaderLastMs = 0;
+            t.TrackPos = -1; t.InPitLane = false; t.HasLeader = true; t.LeaderBestMs = 0; t.LeaderLastMs = 0; t.SessionBestMs = 0;
             t.Sector = BitConverter.ToInt32(tb, T_SECTOR);
             t.LapValid = tb[T_LAPINV] == 0;
             t.TrackId = Str(tb, T_TRACK, 64, false) + "|" + Str(tb, T_VEHNAME, 64, false);
@@ -271,12 +271,15 @@ namespace SimracingBR
                 t.LastLapMs = LapOrZero((long)(BitConverter.ToDouble(veh, vo + V_TIMES + 8 * 8) * 1000));
             }
             for (int i = 0; i < nVeh; i++)
+            {
+                int best = LapOrZero((long)(BitConverter.ToDouble(veh, i * VEH_LEN + V_TIMES + 5 * 8) * 1000));
+                if (best > 0 && (t.SessionBestMs == 0 || best < t.SessionBestMs)) t.SessionBestMs = best;
                 if (veh[i * VEH_LEN + V_PLACE] == 1)
                 {
-                    t.LeaderBestMs = LapOrZero((long)(BitConverter.ToDouble(veh, i * VEH_LEN + V_TIMES + 5 * 8) * 1000));
+                    t.LeaderBestMs = best;
                     t.LeaderLastMs = LapOrZero((long)(BitConverter.ToDouble(veh, i * VEH_LEN + V_TIMES + 8 * 8) * 1000));
-                    break;
                 }
+            }
         }
 
         double D(int off) { return BitConverter.ToDouble(tb, off); }

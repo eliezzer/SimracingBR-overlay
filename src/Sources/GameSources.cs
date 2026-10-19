@@ -73,7 +73,7 @@ namespace SimracingBR
             double u = lap / Lap, amp = 0.045 * Math.Sin(lapIdx * 2.1 + 1.0);
             t.TrackPos = (float)Math.Max(0, Math.Min(1, u + amp * Math.Sin(6 * Math.PI * u)));
             t.Sector = -1; t.LapValid = true; t.InPitLane = false; t.TrackId = "demo";
-            t.HasLeader = true; t.LeaderBestMs = 59412;
+            t.HasLeader = true; t.LeaderBestMs = 59412; t.SessionBestMs = 59999;
             double ph = s * 1.1;
             double gas = Math.Max(0, Math.Min(1, 0.55 + 0.6 * Math.Sin(ph) + 0.15 * Math.Sin(ph * 3.1)));
             double brk = Math.Max(0, Math.Min(1, 0.9 * Math.Sin(ph + 2.4) - 0.15));

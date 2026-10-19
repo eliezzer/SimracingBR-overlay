@@ -140,7 +140,8 @@ namespace SimracingBR
             int last = T.LastLapMs > 0 ? T.LastLapMs : Tracker.OwnLastMs;
             Brush cur = !T.LapValid ? Chrome.Br(255, 255, 70, 60) : (Tracker.Ahead ? Chrome.Br(Chrome.Mix(CPurple, Colors.White, 0.25)) : white);   // red = invalid lap, purple = ahead of the best lap
             Item(dc, PAD + 4, PAD, L.T("CURRENT", "ATUAL"), Chrome.Time(T.LapMs), cur);
-            Item(dc, PAD + TIME_COL + 4, PAD, L.T("BEST", "MELHOR"), Chrome.Time(best), white);
+            Brush bestInk = best > 0 && T.SessionBestMs > 0 && best <= T.SessionBestMs ? Chrome.Br(Chrome.Mix(CPurple, Colors.White, 0.25)) : white;   // purple = fastest lap of the session (where the game shows everyone's times)
+            Item(dc, PAD + TIME_COL + 4, PAD, L.T("BEST", "MELHOR"), Chrome.Time(best), bestInk);
             Item(dc, PAD + 4, PAD + TIME_ROW, L.T("LAST", "ÚLTIMA"), Chrome.Time(last), white);
             if (ShowLeader && T.HasLeader) Item(dc, PAD + TIME_COL + 4, PAD + TIME_ROW, L.T("LEADER", "LÍDER"), Chrome.Time(T.LeaderBestMs), white);
         }

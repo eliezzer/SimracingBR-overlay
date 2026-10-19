@@ -181,13 +181,18 @@ namespace SimracingBR
             t.BestLapMs = LapOrZero((long)(F(BESTLAP) * 1000));
             t.LastLapMs = LapOrZero((long)(F(LASTLAP) * 1000));
             t.HasLeader = true; t.LeaderBestMs = 0; t.LeaderLastMs = 0;
+            t.SessionBestMs = 0;
             for (int i = 0; i < n; i++)
-                if (Pages[0][PART + i * PART_LEN + P_ACTIVE] != 0 && U(PART + i * PART_LEN + P_RACEPOS) == 1)
+            {
+                if (Pages[0][PART + i * PART_LEN + P_ACTIVE] == 0) continue;
+                int best = LapOrZero((long)(F(PTIMES + (6 * MAXP + i) * 4) * 1000));
+                if (best > 0 && (t.SessionBestMs == 0 || best < t.SessionBestMs)) t.SessionBestMs = best;
+                if (U(PART + i * PART_LEN + P_RACEPOS) == 1)
                 {
-                    t.LeaderBestMs = LapOrZero((long)(F(PTIMES + (6 * MAXP + i) * 4) * 1000));
+                    t.LeaderBestMs = best;
                     t.LeaderLastMs = LapOrZero((long)(F(PTIMES + (7 * MAXP + i) * 4) * 1000));
-                    break;
                 }
+            }
             t.TrackId = Str(Pages[0], TRACKLOC, 64, false) + "/" + Str(Pages[0], TRACKVAR, 64, false) + "|" + Str(Pages[0], CARNAME, 64, false);
         }
 
