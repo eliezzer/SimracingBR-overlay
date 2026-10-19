@@ -69,11 +69,12 @@ namespace SimracingBR
         static readonly int G_STATUS = G("status"), G_LAPMS = G("iCurrentTime"), G_INPIT = G("isInPit"), G_PITLANE = G("isInPitLane"),
             G_SETUP = G("isSetupMenuVisible"), G_TC = G("TC"), G_TCCUT = G("TCCut"), G_ABS = G("ABS"),
             G_FUELLAP = G("fuelXLap"), G_LAPSLEFT = G("fuelEstimatedLaps"), G_LAPS = G("completedLaps"),
-            G_DRIVERS = G("activeCars"), G_NPOS = G("normalizedCarPosition"), G_SECTOR = G("currentSectorIndex"), G_LAST = G("iLastTime"), G_BEST = G("iBestTime"), G_VALID = G("isValidLap");
+            G_DRIVERS = G("activeCars"), G_SESSIONTYPE = G("session"), G_TIMELEFT = G("sessionTimeLeft"), G_NUMLAPS = G("numberOfLaps"), G_MAP = G("EngineMap"), G_NPOS = G("normalizedCarPosition"), G_SECTOR = G("currentSectorIndex"), G_LAST = G("iLastTime"), G_BEST = G("iBestTime"), G_VALID = G("isValidLap");
         static readonly int GFX_LEN = G("fuelEstimatedLaps") + 4;
         static readonly int S_MAXRPM = S("maxRpm"), S_MAXFUEL = S("maxFuel"), S_SMVER = S("smVersion"), S_TRACK = S("track"), S_CAR = S("carModel");
         static readonly int STATIC_LEN = S("maxFuel") + 4;
 
+        const int ACC_BRAKEBIAS = 564;   // SPageFilePhysics.brakeBias
         readonly double steerLock;       // ACC only gives steering as -1..1; full lock-to-lock rotation in degrees
         DateTime lastChange = DateTime.MinValue;
         int lastPacket = -1;
@@ -128,6 +129,18 @@ namespace SimracingBR
             t.HasLeader = false; Array.Clear(t.SessionBestSecMs, 0, 3);
             t.Drivers = BitConverter.ToInt32(gb, G_DRIVERS);
             t.TrackId = Str(sb, S_TRACK, 66, true) + "|" + Str(sb, S_CAR, 66, true);
+            t.ClearExtras();
+            t.LapCount = BitConverter.ToInt32(gb, G_LAPS);
+            float maxFuel = BitConverter.ToSingle(sb, S_MAXFUEL);
+            t.FuelCap = maxFuel > 0 && maxFuel < 1000 ? maxFuel : 0;
+            t.SessionIsRace = BitConverter.ToInt32(gb, G_SESSIONTYPE) == 2;
+            float left = BitConverter.ToSingle(gb, G_TIMELEFT);
+            t.SessionTimeLeftMs = left > 0 && left < 3.6e8f ? (int)left : -1;
+            int nl = BitConverter.ToInt32(gb, G_NUMLAPS);
+            t.SessionLaps = nl > 0 && nl < 1000 ? nl : 0;
+            t.EngineMap = BitConverter.ToInt32(gb, G_MAP);
+            float abb = BitConverter.ToSingle(pb, ACC_BRAKEBIAS);
+            t.BrakeBias = abb > 0.2f && abb < 0.95f ? abb : -1;
             if (float.IsNaN(t.Fuel) || t.Fuel < 0 || t.Fuel > 1000) t.Fuel = 0;
             if (float.IsNaN(t.FuelPerLap) || t.FuelPerLap < 0 || t.FuelPerLap > 100) t.FuelPerLap = 0;
             return true;

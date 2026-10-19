@@ -170,9 +170,9 @@ namespace SimracingBR
         static int V(string f) { return Off(typeof(LmuVehScoring), f); }
         static int T(string f) { return Off(typeof(LmuTelem), f); }
         static readonly int S_NUMVEH = S("mNumVehicles"), S_REALTIME = S("mInRealtime"), S_PHASE = S("mGamePhase");
-        static readonly int S_LAPLEN = S("mLapDist");
+        static readonly int S_LAPLEN = S("mLapDist"), S_SESSION = S("mSession"), S_MAXLAPS = S("mMaxLaps"), S_ENDET = S("mEndET"), S_CURET = S("mCurrentET");
         // VehicleScoringInfoV01.mLapDist .. mCurSector2: lapDist, pathLateral, trackEdge, bestS1, bestS2, bestLap, lastS1, lastS2, lastLap, curS1, curS2
-        static readonly int V_TIMES = V("mLapDistToCurSector2"), V_PLACE = V("mPlace");
+        static readonly int V_TIMES = V("mLapDistToCurSector2"), V_PLACE = V("mPlace"), V_TOTALLAPS = V("mTotalLaps"), V_DRS = V("mDRSState");
         static readonly int V_ID = V("mID"),V_ISPLAYER = V("mIsPlayer"), V_INPITS = V("mInPits"), V_GARAGE = V("mInGarageStall"), V_PITSTATE = V("mPitState");
         static readonly int T_ID = T("mID"), T_ET = T("mElapsedTime"), T_LAP = T("mLapNumber"), T_LAPSTART = T("mLapStartET"),
             T_VEL = T("mLocalVel"), T_GEAR = T("mGear"), T_RPM = T("mEngineRPM"), T_GAS = T("mUnfilteredThrottle"),
@@ -181,7 +181,8 @@ namespace SimracingBR
             T_WHEELRANGE = T("mPhysicalSteeringWheelRange"), T_ABSACT = T("mABSActive"), T_TCACT = T("mTCActive"),
             T_TC = T("mTC"), T_TCMAX = T("mTCMax"), T_TCCUT = T("mTCCut"), T_TCCUTMAX = T("mTCCutMax"),
             T_ABS = T("mABS"), T_ABSMAX = T("mABSMax"), T_SECTOR = T("mCurrentSector"), T_LAPINV = T("mLapInvalidated"),
-            T_TRACK = T("mTrackName"), T_VEHNAME = T("mVehicleName");
+            T_TRACK = T("mTrackName"), T_VEHNAME = T("mVehicleName"), T_MAP = T("mMotorMap"), T_MAPMAX = T("mMotorMapMax"),
+            T_REARBIAS = T("mRearBrakeBias"), T_SOC = T("mSoC"), T_VE = T("mVirtualEnergy");
 
         readonly double steerLock;
         readonly byte[] si = new byte[SI_LEN], veh = new byte[MAX_VEH * VEH_LEN], th = new byte[4], tb = new byte[TI_LEN];
@@ -247,8 +248,33 @@ namespace SimracingBR
             t.Status = si[S_REALTIME] != 0 ? 2 : 0;              // at the monitor / garage screen otherwise
             t.InPitBox = vehIdx >= 0 && veh[vehIdx * VEH_LEN + V_GARAGE] != 0;
             FillLaps(t, et, nVeh);
+            FillExtras(t, nVeh);
             return true;
         }
+
+        // session, fuel and electronics for the fuel / electronics overlays
+        void FillExtras(Tele t, int nVeh)
+        {
+            t.ClearExtras();
+            t.FuelCap = (float)D(T_FUELCAP);
+            if (float.IsNaN(t.FuelCap) || t.FuelCap < 0 || t.FuelCap > 1000) t.FuelCap = 0;
+            int session = BitConverter.ToInt32(si, S_SESSION);
+            t.SessionIsRace = session >= 10 && session <= 13;
+            int maxLaps = BitConverter.ToInt32(si, S_MAXLAPS);
+            t.SessionLaps = maxLaps > 0 && maxLaps < 10000 ? maxLaps : 0;
+            double endET = BitConverter.ToDouble(si, S_ENDET), curET = BitConverter.ToDouble(si, S_CURET), left = endET - curET;
+            t.SessionTimeLeftMs = left > 0 && left < 360000 ? (int)(left * 1000) : -1;
+            if (vehIdx >= 0) t.LapCount = BitConverter.ToInt16(veh, vehIdx * VEH_LEN + V_TOTALLAPS);
+            t.TcMax = tb[T_TCMAX] > 0 ? tb[T_TCMAX] : -1; t.TcCutMax = tb[T_TCCUTMAX] > 0 ? tb[T_TCCUTMAX] : -1; t.AbsMax = tb[T_ABSMAX] > 0 ? tb[T_ABSMAX] : -1;
+            if (tb[T_MAPMAX] > 0) { t.EngineMap = tb[T_MAP]; t.EngineMapMax = tb[T_MAPMAX]; }
+            double rear = D(T_REARBIAS);
+            t.BrakeBias = rear > 0.05 && rear < 0.8 ? (float)(1 - rear) : -1;
+            float soc = BitConverter.ToSingle(tb, T_SOC), ve = BitConverter.ToSingle(tb, T_VE);
+            t.BatteryPct = soc >= 0 && soc <= 1.001f ? soc * 100 : -1;
+            t.EnergyPct = ve >= 0 && ve <= 1.001f ? ve * 100 : -1;
+            if (vehIdx >= 0 && veh[vehIdx * VEH_LEN + V_DRS] != 0) t.Drs = veh[vehIdx * VEH_LEN + V_DRS] >= 2 ? 2 : 1;
+        }
+
 
         // Lap position, sector, lap times and the leader's times. The scoring page (lap distance) refreshes only a few
         // times a second, so the position is dead-reckoned from the telemetry speed in between.

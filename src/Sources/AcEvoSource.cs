@@ -82,7 +82,8 @@ namespace SimracingBR
             G_FUELLAP = G("fuelLiterPerLap"), G_LAPMS = G("currentLapTimeMs"), G_LAPSPOSS = G("lapsPossibleWithFuel"),
             G_RPM = G("rpm"), G_ELEC = G("electronics"), G_SHIFTUP = G("isChangeUp"),
             G_CLUTCHPCT = G("clutchPercent"), G_STATUS = G("status"), G_PITBOX = G("isInPitBox"), G_PITLANE = G("isInPitLane"), G_LOCATION = G("carLocation"),
-            G_DRIVERS = G("totalDrivers"), G_NPOS = G("npos"), G_LASTLAP = G("lastLaptimeMs"), G_BESTLAP = G("bestLaptimeMs"), G_VALID = G("isValidLap"), G_CAR = G("carModel");
+            G_DRIVERS = G("totalDrivers"), G_LAPCOUNT = G("totalLapCount"), G_FUELPCT = G("fuelLiterCurrentQuantityPercent"), G_SESSION = G("sessionState"),
+            G_ELECMAX = G("electronicsMax"), G_DIFFP = G("diffPowerRaw"), G_DIFFC = G("diffCoastRaw"), G_KERS = G("kersCurrentPerc"), G_HASKERS = G("hasKers"), G_DRSAVAIL = G("isDrsAvailable"), G_NPOS = G("npos"), G_LASTLAP = G("lastLaptimeMs"), G_BESTLAP = G("bestLaptimeMs"), G_VALID = G("isValidLap"), G_CAR = G("carModel");
         static readonly int GFX_LEN = G("isValidLap") + 1;
 
         DateTime lastChange = DateTime.MinValue;
@@ -134,6 +135,26 @@ namespace SimracingBR
             t.HasLeader = false; Array.Clear(t.SessionBestSecMs, 0, 3);
             t.Drivers = (int)BitConverter.ToUInt32(gb, G_DRIVERS);
             t.TrackId = Str(Pages[2], S_TRACK, 32, false) + "/" + Str(Pages[2], S_LAYOUT, 32, false) + "|" + Str(gb, G_CAR, 33, false);
+            // session / fuel / electronics for the fuel and electronics overlays
+            t.ClearExtras();
+            t.LapCount = BitConverter.ToInt32(gb, G_LAPCOUNT);
+            float fpct = BitConverter.ToSingle(gb, G_FUELPCT);
+            t.FuelCap = (fpct > 0.01f && fpct <= 1.001f && t.Fuel > 0) ? t.Fuel / fpct : 0;
+            t.SessionIsRace = Str(Pages[2], 36, 24, false) == "Race";
+            t.SessionTimeLeftMs = ParseClockMs(Str(gb, G_SESSION + 33, 20, false));
+            t.SessionLaps = 0;                                       // not published
+            t.TcMax = (sbyte)gb[G_ELECMAX]; t.TcCutMax = (sbyte)gb[G_ELECMAX + 1]; t.AbsMax = (sbyte)gb[G_ELECMAX + 2];
+            t.EscLevel = (sbyte)gb[G_ELEC + 3]; t.EscMax = (sbyte)gb[G_ELECMAX + 3];
+            t.EngineMap = -1; t.EngineMapMax = -1;
+            float bb = BitConverter.ToSingle(gb, G_ELEC + 8);
+            t.BrakeBias = bb > 0.2f && bb < 0.95f ? bb : -1;
+            float dp = BitConverter.ToSingle(gb, G_DIFFP), dc = BitConverter.ToSingle(gb, G_DIFFC);
+            bool diff = (dp > 0 || dc > 0) && dp <= 1.001f && dc <= 1.001f;
+            t.DiffPower = diff ? dp : -1; t.DiffCoast = diff ? dc : -1;
+            float kers = BitConverter.ToSingle(gb, G_KERS);
+            t.BatteryPct = gb[G_HASKERS] != 0 ? (kers <= 1.001f ? kers * 100 : kers) : -1;
+            t.EnergyPct = -1;
+            t.Drs = gb[G_DRSAVAIL] != 0 ? 1 : -1;
             if (float.IsNaN(t.Fuel) || t.Fuel < 0 || t.Fuel > 1000) t.Fuel = 0;
             if (float.IsNaN(t.FuelPerLap) || t.FuelPerLap < 0 || t.FuelPerLap > 100) t.FuelPerLap = 0;
             return true;

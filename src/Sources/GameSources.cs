@@ -74,6 +74,13 @@ namespace SimracingBR
             t.TrackPos = (float)Math.Max(0, Math.Min(1, u + amp * Math.Sin(6 * Math.PI * u)));
             t.Sector = -1; t.LapValid = true; t.InPitLane = false; t.TrackId = "demo";
             t.HasLeader = true; t.LeaderBestMs = 59412; t.SessionBestMs = 59999; t.Drivers = 1;
+            // fuel / electronics demo: a 30 minute race, a GT3-like car with some hybrid extras so every card shows
+            t.LapCount = lapIdx; t.FuelCap = 100; t.SessionIsRace = true; t.SessionLaps = 0;
+            t.SessionTimeLeftMs = (int)((1800 - s % 1800) * 1000); t.BestLapMs = 59999;
+            t.TcMax = 12; t.TcCutMax = 10; t.AbsMax = 10; t.EscLevel = 2; t.EscMax = 5; t.EngineMap = 3; t.EngineMapMax = 8;
+            t.BrakeBias = 0.58f; t.DiffPower = 0.5f; t.DiffCoast = 0.8f;
+            t.BatteryPct = (float)(55 + 40 * Math.Sin(s * 0.3)); t.EnergyPct = (float)(80 - (s % 600) / 10.0);
+            t.Drs = ((int)(s / 6)) % 3;
             double ph = s * 1.1;
             double gas = Math.Max(0, Math.Min(1, 0.55 + 0.6 * Math.Sin(ph) + 0.15 * Math.Sin(ph * 3.1)));
             double brk = Math.Max(0, Math.Min(1, 0.9 * Math.Sin(ph + 2.4) - 0.15));
